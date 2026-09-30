@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ideal-ofertas-pwa-shell-v2';
+const CACHE_NAME = 'ideal-ofertas-pwa-shell-v3';
 
 const STATIC_FILES = [
   './',
