@@ -5,63 +5,105 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>IDEAL Ofertas & Pedidos</title>
 
-  <meta name="theme-color" content="#e30613">
+  <meta name="theme-color" content="#ed0013">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="IDEAL Ofertas">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="application-name" content="IDEAL Ofertas & Pedidos">
 
-  <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="apple-touch-icon" href="./icon-192.png">
+  <link rel="manifest" href="./manifest.webmanifest?v=811">
+  <link rel="apple-touch-icon" href="./icon-192.png?v=811">
 
   <style>
     *{box-sizing:border-box}
-    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#f6f6f6;font-family:Arial,Helvetica,sans-serif}
-    #appFrame{position:fixed;inset:0;width:100%;height:100%;border:0;background:#fff}
-    #installBar{
-      display:none; position:fixed; left:10px; right:10px;
-      bottom:calc(10px + env(safe-area-inset-bottom));
-      z-index:99999; background:#fff; border:1px solid #e6e6e6;
-      border-radius:16px; box-shadow:0 12px 32px rgba(0,0,0,.22);
-      padding:10px 11px; align-items:center; gap:10px;
+    html,body{
+      margin:0;
+      width:100%;
+      height:100%;
+      overflow:hidden;
+      background:#ed0013;
+      font-family:Arial,Helvetica,sans-serif;
     }
+
+    #appFrame{
+      position:fixed;
+      inset:0;
+      width:100%;
+      height:100%;
+      border:0;
+      background:#fff;
+      opacity:0;
+      transition:opacity .18s ease;
+    }
+
+    #appFrame.pronto{opacity:1}
+
+    #installBar{
+      display:none;
+      position:fixed;
+      left:10px;
+      right:10px;
+      bottom:calc(10px + env(safe-area-inset-bottom));
+      z-index:99999;
+      background:#fff;
+      border:1px solid #e6e6e6;
+      border-radius:16px;
+      box-shadow:0 12px 32px rgba(0,0,0,.22);
+      padding:10px 11px;
+      align-items:center;
+      gap:10px;
+    }
+
     #installText{flex:1;min-width:0}
     #installText strong{display:block;font-size:13px;color:#222}
     #installText span{display:block;font-size:10px;color:#777;margin-top:2px;line-height:1.3}
+
     #btnInstall{
-      border:0;border-radius:10px;background:#e30613;color:#fff;
-      min-height:44px;padding:9px 14px;font-weight:800;cursor:pointer
+      border:0;
+      border-radius:10px;
+      background:#ed0013;
+      color:#fff;
+      min-height:44px;
+      padding:9px 14px;
+      font-weight:800;
+      cursor:pointer;
     }
+
     #btnClose{
-      width:42px;height:42px;border:0;border-radius:10px;
-      background:#f1f1f1;color:#444;font-size:22px;cursor:pointer
+      width:42px;
+      height:42px;
+      border:0;
+      border-radius:10px;
+      background:#f1f1f1;
+      color:#444;
+      font-size:22px;
+      cursor:pointer;
     }
+
     #iosHelp{
-      display:none;position:fixed;left:10px;right:10px;
+      display:none;
+      position:fixed;
+      left:10px;
+      right:10px;
       bottom:calc(10px + env(safe-area-inset-bottom));
-      z-index:100000;background:#fff;border:1px solid #e6e6e6;
-      border-radius:16px;box-shadow:0 12px 32px rgba(0,0,0,.22);
-      padding:14px;font-size:12px;line-height:1.45;color:#444
+      z-index:100000;
+      background:#fff;
+      border:1px solid #e6e6e6;
+      border-radius:16px;
+      box-shadow:0 12px 32px rgba(0,0,0,.22);
+      padding:14px;
+      font-size:12px;
+      line-height:1.45;
+      color:#444;
     }
-    #loading{
-      position:fixed;inset:0;z-index:99998;background:#e30613;
-      display:flex;flex-direction:column;align-items:center;justify-content:center;
-      color:#fff;text-align:center;padding:30px;transition:opacity .25s ease
+
+    @media(display-mode:standalone){
+      #installBar,#iosHelp{display:none!important}
     }
-    #loading img{width:128px;height:128px;border-radius:28px;object-fit:cover;margin-bottom:14px}
-    #loading strong{font-size:20px}
-    #loading span{font-size:12px;opacity:.9;margin-top:4px}
-    @media(display-mode:standalone){#installBar,#iosHelp{display:none!important}}
   </style>
 </head>
 <body>
-
-  <div id="loading">
-    <img src="./icon-192.png" alt="IDEAL Supermercados">
-    <strong>IDEAL Ofertas & Pedidos</strong>
-    <span>Carregando ofertas...</span>
-  </div>
 
   <iframe
     id="appFrame"
@@ -87,18 +129,15 @@
 
   <script>
     const frame = document.getElementById('appFrame');
-    const loading = document.getElementById('loading');
 
     frame.addEventListener('load', () => {
-      setTimeout(() => {
-        loading.style.opacity = '0';
-        setTimeout(() => loading.style.display = 'none', 260);
-      }, 500);
+      frame.classList.add('pronto');
     });
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js', { scope: './' })
+        navigator.serviceWorker
+          .register('./service-worker.js?v=811', { scope: './' })
           .then(reg => console.log('IDEAL PWA ativo:', reg.scope))
           .catch(err => console.error('Erro Service Worker:', err));
       });
