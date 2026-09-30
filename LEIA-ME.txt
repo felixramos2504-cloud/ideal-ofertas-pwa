@@ -1,0 +1,26 @@
+IDEAL OFERTAS & PEDIDOS — PWA FINAL
+
+Substitua o conteúdo do repositório GitHub Pages "ideal-ofertas-pwa"
+por estes arquivos.
+
+URL do sistema incorporado:
+https://script.google.com/macros/s/AKfycbytBbNlTDlrBvD2TMI67xi2xIje4eaFN8kkgQzACyjDZhVwnA-95xwDm0pfirgDKNAR/exec
+
+Arquivos:
+- index.html
+- manifest.webmanifest
+- service-worker.js
+- icon-192.png
+- icon-512.png
+- icon-maskable-192.png
+- icon-maskable-512.png
+
+Depois de enviar:
+1. Settings > Pages
+2. Confirme: Deploy from a branch
+3. Branch: main / root
+4. Aguarde a publicação
+5. Abra:
+   https://felixramos2504-cloud.github.io/ideal-ofertas-pwa/
+
+É ESSA URL DO GITHUB PAGES que deve ser usada para instalar o aplicativo.
