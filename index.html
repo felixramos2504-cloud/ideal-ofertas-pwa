@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>IDEAL Ofertas & Pedidos</title>
+
+  <meta name="theme-color" content="#e30613">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="IDEAL Ofertas">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="application-name" content="IDEAL Ofertas & Pedidos">
+
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+
+  <style>
+    *{box-sizing:border-box}
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#f6f6f6;font-family:Arial,Helvetica,sans-serif}
+    #appFrame{position:fixed;inset:0;width:100%;height:100%;border:0;background:#fff}
+    #installBar{
+      display:none; position:fixed; left:10px; right:10px;
+      bottom:calc(10px + env(safe-area-inset-bottom));
+      z-index:99999; background:#fff; border:1px solid #e6e6e6;
+      border-radius:16px; box-shadow:0 12px 32px rgba(0,0,0,.22);
+      padding:10px 11px; align-items:center; gap:10px;
+    }
+    #installText{flex:1;min-width:0}
+    #installText strong{display:block;font-size:13px;color:#222}
+    #installText span{display:block;font-size:10px;color:#777;margin-top:2px;line-height:1.3}
+    #btnInstall{
+      border:0;border-radius:10px;background:#e30613;color:#fff;
+      min-height:44px;padding:9px 14px;font-weight:800;cursor:pointer
+    }
+    #btnClose{
+      width:42px;height:42px;border:0;border-radius:10px;
+      background:#f1f1f1;color:#444;font-size:22px;cursor:pointer
+    }
+    #iosHelp{
+      display:none;position:fixed;left:10px;right:10px;
+      bottom:calc(10px + env(safe-area-inset-bottom));
+      z-index:100000;background:#fff;border:1px solid #e6e6e6;
+      border-radius:16px;box-shadow:0 12px 32px rgba(0,0,0,.22);
+      padding:14px;font-size:12px;line-height:1.45;color:#444
+    }
+    #loading{
+      position:fixed;inset:0;z-index:99998;background:#e30613;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      color:#fff;text-align:center;padding:30px;transition:opacity .25s ease
+    }
+    #loading img{width:128px;height:128px;border-radius:28px;object-fit:cover;margin-bottom:14px}
+    #loading strong{font-size:20px}
+    #loading span{font-size:12px;opacity:.9;margin-top:4px}
+
+    /* MASTER 9.7.2 — NOTIFICAÇÕES PUSH */
+    #pushBox{
+      position:fixed;
+      top:calc(10px + env(safe-area-inset-top));
+      right:10px;
+      z-index:100002;
+      display:flex;
+      flex-direction:column;
+      align-items:flex-end;
+      gap:6px;
+      pointer-events:none;
+    }
+
+    #btnPush{
+      pointer-events:auto;
+      border:0;
+      border-radius:999px;
+      min-height:42px;
+      padding:9px 14px;
+      background:#fff;
+      color:#222;
+      box-shadow:0 6px 20px rgba(0,0,0,.20);
+      font-weight:800;
+      font-size:12px;
+      cursor:pointer;
+      border:1px solid #e7e7e7;
+    }
+
+    #btnPush.ativo{
+      background:#e8f6ed;
+      color:#176b38;
+      border-color:#bfe4ca;
+    }
+
+    #btnPush.bloqueado{
+      background:#fff1f1;
+      color:#9c1b24;
+      border-color:#f1c7cb;
+    }
+
+    #pushMsg{
+      display:none;
+      pointer-events:none;
+      max-width:min(320px,calc(100vw - 20px));
+      background:#222;
+      color:#fff;
+      border-radius:10px;
+      padding:8px 10px;
+      font-size:10px;
+      line-height:1.35;
+      box-shadow:0 6px 20px rgba(0,0,0,.20);
+    }
+
+    #pushToast{
+      display:none;
+      position:fixed;
+      left:10px;
+      right:10px;
+      top:calc(62px + env(safe-area-inset-top));
+      z-index:100003;
+      max-width:520px;
+      margin:0 auto;
+      background:#fff;
+      color:#222;
+      border-left:5px solid #ed0013;
+      border-radius:12px;
+      box-shadow:0 10px 28px rgba(0,0,0,.22);
+      padding:11px 13px;
+      font-size:12px;
+      line-height:1.4;
+    }
+
+    #pushToast strong{
+      display:block;
+      margin-bottom:3px;
+      color:#ed0013;
+    }
+
+    @media(display-mode:standalone){#installBar,#iosHelp{display:none!important}}
+  </style>
+</head>
+<body>
+
+  <div id="loading">
+    <img src="./icon-192.png" alt="IDEAL Supermercados">
+    <strong>IDEAL Ofertas & Pedidos</strong>
+    <span>Carregando ofertas...</span>
+  </div>
+
+  <iframe
+    id="appFrame"
+    src="https://script.google.com/macros/s/AKfycbytBbNlTDlrBvD2TMI67xi2xIje4eaFN8kkgQzACyjDZhVwnA-95xwDm0pfirgDKNAR/exec"
+    title="IDEAL Ofertas & Pedidos"
+    allow="clipboard-read; clipboard-write"
+  ></iframe>
+
+
+  <!-- MASTER 9.7.2 — NOTIFICAÇÕES PUSH -->
+  <div id="pushBox">
+    <button id="btnPush" type="button">🔔 Ativar notificações</button>
+    <div id="pushMsg"></div>
+  </div>
+
+  <div id="pushToast" role="status" aria-live="polite">
+    <strong id="pushToastTitle">IDEAL Supermercados</strong>
+    <span id="pushToastBody"></span>
+  </div>
+
+  <div id="installBar">
+    <div id="installText">
+      <strong>📲 Instale o IDEAL Ofertas & Pedidos</strong>
+      <span>Acesse ofertas, carrinho e pedidos direto pela tela inicial.</span>
+    </div>
+    <button id="btnInstall" type="button">Instalar</button>
+    <button id="btnClose" type="button" aria-label="Fechar">×</button>
+  </div>
+
+  <div id="iosHelp">
+    <strong>📱 Para instalar no iPhone/iPad:</strong><br>
+    No Safari, toque em <b>Compartilhar</b> e depois em
+    <b>Adicionar à Tela de Início</b>.
+  </div>
+
+  <script>
+    const frame = document.getElementById('appFrame');
+    const loading = document.getElementById('loading');
+
+    frame.addEventListener('load', () => {
+      setTimeout(() => {
+        loading.style.opacity = '0';
+        setTimeout(() => loading.style.display = 'none', 260);
+      }, 500);
+    });
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js', { scope: './' })
+          .then(reg => console.log('IDEAL PWA ativo:', reg.scope))
+          .catch(err => console.error('Erro Service Worker:', err));
+      });
+    }
+
+    let deferredPrompt = null;
+    const bar = document.getElementById('installBar');
+    const btnInstall = document.getElementById('btnInstall');
+    const btnClose = document.getElementById('btnClose');
+    const iosHelp = document.getElementById('iosHelp');
+
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      window.navigator.standalone === true;
+
+    window.addEventListener('beforeinstallprompt', event => {
+      event.preventDefault();
+      deferredPrompt = event;
+
+      if (!isStandalone && localStorage.getItem('idealPwaBarFechada') !== '1') {
+        bar.style.display = 'flex';
+      }
+    });
+
+    btnInstall.addEventListener('click', async () => {
+      if (deferredPrompt) {
+        bar.style.display = 'none';
+        await deferredPrompt.prompt();
+        await deferredPrompt.userChoice;
+        deferredPrompt = null;
+        return;
+      }
+
+      const isiOS = /iphone|ipad|ipod/i.test(navigator.userAgent || '');
+      if (isiOS) {
+        iosHelp.style.display = 'block';
+        setTimeout(() => iosHelp.style.display = 'none', 9000);
+      } else {
+        alert('Abra o menu do navegador e escolha "Instalar app" ou "Adicionar à tela inicial".');
+      }
+    });
+
+    btnClose.addEventListener('click', () => {
+      localStorage.setItem('idealPwaBarFechada', '1');
+      bar.style.display = 'none';
+    });
+
+    window.addEventListener('appinstalled', () => {
+      localStorage.removeItem('idealPwaBarFechada');
+      bar.style.display = 'none';
+      deferredPrompt = null;
+    });
+  </script>
+
+  <!-- MASTER 9.7.2 — FIREBASE CLOUD MESSAGING -->
+  <script type="module">
+    import { initializeApp } from
+      'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
+
+    import {
+      getMessaging,
+      isSupported,
+      onMessage,
+      onRegistered,
+      register
+    } from
+      'https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCxNq9yO7JhXn9PHqgAMdls5Cb89yq2tv0",
+      authDomain: "ideal-ofertas.firebaseapp.com",
+      projectId: "ideal-ofertas",
+      storageBucket: "ideal-ofertas.firebasestorage.app",
+      messagingSenderId: "554998916130",
+      appId: "1:554998916130:web:ce65e917617d036f89167b"
+    };
+
+    const VAPID_PUBLIC_KEY =
+      "BFqbS_rj0lihvZnpl3n6RBf58k1U5S8i96ziLKok2d19uuV8oo1hv6utVLz2KIUaJYKkdaYpHzuw0T1dVK4_2Mw";
+
+    const btnPush = document.getElementById('btnPush');
+    const pushMsg = document.getElementById('pushMsg');
+    const pushToast = document.getElementById('pushToast');
+    const pushToastTitle = document.getElementById('pushToastTitle');
+    const pushToastBody = document.getElementById('pushToastBody');
+
+    function mostrarMensagemPush(texto, tempo = 6000){
+      pushMsg.textContent = texto;
+      pushMsg.style.display = 'block';
+
+      window.clearTimeout(window.__idealPushMsgTimer);
+
+      window.__idealPushMsgTimer = window.setTimeout(() => {
+        pushMsg.style.display = 'none';
+      }, tempo);
+    }
+
+    function atualizarBotaoPush(){
+      const permissao =
+        ('Notification' in window)
+          ? Notification.permission
+          : 'unsupported';
+
+      const fid = localStorage.getItem('idealFcmFid') || '';
+
+      btnPush.classList.remove('ativo', 'bloqueado');
+
+      if(permissao === 'granted' && fid){
+        btnPush.textContent = '🔔 Notificações ativas';
+        btnPush.classList.add('ativo');
+        return;
+      }
+
+      if(permissao === 'denied'){
+        btnPush.textContent = '🔕 Notificações bloqueadas';
+        btnPush.classList.add('bloqueado');
+        return;
+      }
+
+      btnPush.textContent = '🔔 Ativar notificações';
+    }
+
+    function mostrarToastPush(payload){
+      const notification = payload?.notification || {};
+      const data = payload?.data || {};
+
+      pushToastTitle.textContent =
+        notification.title ||
+        data.title ||
+        'IDEAL Supermercados';
+
+      pushToastBody.textContent =
+        notification.body ||
+        data.body ||
+        'Você recebeu uma nova atualização.';
+
+      pushToast.style.display = 'block';
+
+      window.clearTimeout(window.__idealPushToastTimer);
+
+      window.__idealPushToastTimer = window.setTimeout(() => {
+        pushToast.style.display = 'none';
+      }, 7000);
+    }
+
+    async function iniciarPush(){
+      try{
+        if(!('Notification' in window)){
+          mostrarMensagemPush(
+            'Este navegador não oferece suporte a notificações.'
+          );
+          return;
+        }
+
+        if(!('serviceWorker' in navigator)){
+          mostrarMensagemPush(
+            'Este navegador não oferece suporte ao recurso necessário para notificações.'
+          );
+          return;
+        }
+
+        const suportado = await isSupported();
+
+        if(!suportado){
+          mostrarMensagemPush(
+            'Notificações Firebase não são compatíveis com este navegador.'
+          );
+          return;
+        }
+
+        const permissao = await Notification.requestPermission();
+
+        if(permissao !== 'granted'){
+          atualizarBotaoPush();
+          mostrarMensagemPush(
+            permissao === 'denied'
+              ? 'As notificações foram bloqueadas. Você pode liberá-las nas permissões do navegador.'
+              : 'A permissão para notificações não foi concedida.'
+          );
+          return;
+        }
+
+        btnPush.disabled = true;
+        btnPush.textContent = 'Ativando...';
+
+        /*
+         * A API atual do Firebase registra a instalação e retorna um
+         * Firebase Installation ID (FID) através de onRegistered().
+         * Esse FID será salvo na planilha na próxima etapa (MASTER 9.7.3).
+         */
+        await register(messaging, {
+          vapidKey: VAPID_PUBLIC_KEY
+        });
+
+        mostrarMensagemPush(
+          'Permissão concedida. Finalizando o registro das notificações...'
+        );
+
+      }catch(err){
+        console.error('IDEAL Push — erro ao ativar:', err);
+
+        mostrarMensagemPush(
+          'Não foi possível ativar as notificações. Tente novamente.'
+        );
+
+      }finally{
+        btnPush.disabled = false;
+        atualizarBotaoPush();
+      }
+    }
+
+    const app = initializeApp(firebaseConfig);
+    const messaging = getMessaging(app);
+
+    /*
+     * Recebe o identificador atual da instalação.
+     * Na MASTER 9.7.3 ele será enviado ao Apps Script e gravado na planilha.
+     */
+    onRegistered(messaging, (installationId) => {
+      if(!installationId) return;
+
+      localStorage.setItem('idealFcmFid', installationId);
+      localStorage.setItem(
+        'idealFcmAtualizadoEm',
+        new Date().toISOString()
+      );
+
+      console.log(
+        'IDEAL Push — FID registrado:',
+        installationId
+      );
+
+      atualizarBotaoPush();
+
+      mostrarMensagemPush(
+        '✅ Notificações ativadas com sucesso.'
+      );
+    });
+
+    /*
+     * Quando o app estiver aberto, o Firebase entrega a mensagem para
+     * onMessage(). Mostramos um aviso dentro do próprio PWA.
+     */
+    onMessage(messaging, (payload) => {
+      console.log(
+        'IDEAL Push — mensagem em primeiro plano:',
+        payload
+      );
+
+      mostrarToastPush(payload);
+    });
+
+    btnPush.addEventListener('click', iniciarPush);
+
+    atualizarBotaoPush();
+  </script>
+
+</body>
+</html>
