@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diagnóstico Push IDEAL</title>
+  <style>
+    body{
+      font-family: Arial, sans-serif;
+      margin:0;
+      padding:20px;
+      background:#f5f5f5;
+      color:#222;
+    }
+    .box{
+      max-width:760px;
+      margin:0 auto;
+      background:#fff;
+      border-radius:16px;
+      padding:20px;
+      box-shadow:0 4px 16px rgba(0,0,0,.10);
+    }
+    h1{font-size:22px;margin-top:0}
+    button{
+      width:100%;
+      padding:14px;
+      border:0;
+      border-radius:10px;
+      font-size:16px;
+      font-weight:700;
+      background:#d71920;
+      color:#fff;
+      cursor:pointer;
+      margin-bottom:14px;
+    }
+    pre{
+      white-space:pre-wrap;
+      word-break:break-word;
+      background:#111;
+      color:#fff;
+      padding:14px;
+      border-radius:10px;
+      min-height:160px;
+      font-size:13px;
+      line-height:1.45;
+    }
+    .ok{color:#166534;font-weight:700}
+    .aviso{color:#92400e;font-weight:700}
+  </style>
+</head>
+<body>
+<div class="box">
+  <h1>Diagnóstico Push — IDEAL</h1>
+  <p>Este arquivo apenas verifica o Service Worker e a inscrição Push. Ele não altera nenhuma configuração.</p>
+  <button id="btn">Executar diagnóstico</button>
+  <pre id="saida">Toque em "Executar diagnóstico".</pre>
+</div>
+
+<script>
+const saida = document.getElementById('saida');
+const btn = document.getElementById('btn');
+
+function linha(nome, valor){
+  return nome + ': ' + valor;
+}
+
+async function diagnosticar(){
+  btn.disabled = true;
+  saida.textContent = 'Verificando...';
+
+  const out = [];
+
+  try{
+    out.push('=== IDEAL PUSH DIAGNÓSTICO 9.7.2.10 ===');
+    out.push(linha('Data', new Date().toLocaleString('pt-BR')));
+    out.push(linha('URL', location.href));
+    out.push(linha('Origem', location.origin));
+    out.push(linha(
+      'Modo instalado',
+      window.matchMedia('(display-mode: standalone)').matches ? 'SIM' : 'NÃO'
+    ));
+
+    out.push('');
+    out.push('=== PERMISSÃO ===');
+
+    if('Notification' in window){
+      out.push(linha('Notification.permission', Notification.permission));
+    }else{
+      out.push('Notification API: NÃO SUPORTADA');
+    }
+
+    out.push('');
+    out.push('=== SERVICE WORKER ===');
+
+    if(!('serviceWorker' in navigator)){
+      out.push('Service Worker: NÃO SUPORTADO');
+      saida.textContent = out.join('\n');
+      return;
+    }
+
+    const controller = navigator.serviceWorker.controller;
+    out.push(linha(
+      'Controller atual',
+      controller ? controller.scriptURL : 'NENHUM'
+    ));
+    out.push(linha(
+      'Controller estado',
+      controller ? controller.state : '-'
+    ));
+
+    const regs = await navigator.serviceWorker.getRegistrations();
+    out.push(linha('Quantidade de registros', regs.length));
+
+    if(!regs.length){
+      out.push('ATENÇÃO: nenhum Service Worker registrado.');
+    }
+
+    for(let i=0;i<regs.length;i++){
+      const reg = regs[i];
+
+      out.push('');
+      out.push('--- REGISTRO ' + (i+1) + ' ---');
+      out.push(linha('Scope', reg.scope));
+
+      if(reg.active){
+        out.push(linha('Active script', reg.active.scriptURL));
+        out.push(linha('Active state', reg.active.state));
+      }else{
+        out.push('Active script: NENHUM');
+      }
+
+      if(reg.waiting){
+        out.push(linha('Waiting script', reg.waiting.scriptURL));
+        out.push(linha('Waiting state', reg.waiting.state));
+      }else{
+        out.push('Waiting script: nenhum');
+      }
+
+      if(reg.installing){
+        out.push(linha('Installing script', reg.installing.scriptURL));
+        out.push(linha('Installing state', reg.installing.state));
+      }else{
+        out.push('Installing script: nenhum');
+      }
+
+      try{
+        const sub = await reg.pushManager.getSubscription();
+
+        if(sub){
+          out.push('PushSubscription: SIM');
+          try{
+            const host = new URL(sub.endpoint).host;
+            out.push(linha('Push endpoint', host));
+          }catch(_){
+            out.push('Push endpoint: presente');
+          }
+
+          out.push(linha(
+            'Chave p256dh',
+            sub.getKey('p256dh') ? 'SIM' : 'NÃO'
+          ));
+          out.push(linha(
+            'Chave auth',
+            sub.getKey('auth') ? 'SIM' : 'NÃO'
+          ));
+        }else{
+          out.push('PushSubscription: NÃO');
+        }
+      }catch(err){
+        out.push('Erro ao consultar PushSubscription: ' + (err.message || err));
+      }
+    }
+
+    out.push('');
+    out.push('=== FIREBASE LOCAL ===');
+    out.push(linha(
+      'FID salvo',
+      localStorage.getItem('idealFcmFid') ? 'SIM' : 'NÃO'
+    ));
+    out.push(linha(
+      'Versão Push salva',
+      localStorage.getItem('idealPushVersion') || 'nenhuma'
+    ));
+
+    out.push('');
+    out.push('=== LEITURA RÁPIDA ===');
+
+    const idealReg = regs.find(r =>
+      r.scope.includes('/ideal-ofertas-pwa/')
+    ) || regs[0];
+
+    if(!idealReg){
+      out.push('FALHA: não existe registro de Service Worker.');
+    }else{
+      const sub = await idealReg.pushManager.getSubscription();
+
+      if(!idealReg.active){
+        out.push('FALHA: o Service Worker não está ativo.');
+      }else if(!sub){
+        out.push('FALHA: não existe PushSubscription ligada ao Service Worker.');
+      }else{
+        out.push('OK: Service Worker ativo + PushSubscription existente.');
+      }
+    }
+
+  }catch(err){
+    out.push('');
+    out.push('ERRO GERAL: ' + (err && (err.stack || err.message) || err));
+  }finally{
+    saida.textContent = out.join('\n');
+    btn.disabled = false;
+  }
+}
+
+btn.addEventListener('click', diagnosticar);
+</script>
+</body>
+</html>
