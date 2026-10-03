@@ -1,5 +1,5 @@
 /* =========================================================
-   IDEAL SUPERMERCADOS — MASTER 9.7.2.4
+   IDEAL SUPERMERCADOS — MASTER 9.7.2.6
    PWA + FIREBASE CLOUD MESSAGING NO MESMO SERVICE WORKER
    ========================================================= */
 
@@ -71,25 +71,31 @@ messaging.onBackgroundMessage(payload => {
     payload
   );
 
-  if(payload && payload.notification){
-    return;
-  }
+  const notification =
+    (payload && payload.notification) || {};
 
-  const data = (payload && payload.data) || {};
+  const data =
+    (payload && payload.data) || {};
 
   const title =
+    notification.title ||
     data.title ||
     'IDEAL Supermercados';
 
   const options = {
     body:
+      notification.body ||
       data.body ||
       'Você recebeu uma nova atualização.',
-    icon: './icon-192.png',
+    icon:
+      notification.icon ||
+      data.icon ||
+      './icon-192.png',
     badge: './icon-192.png',
     tag:
       data.tag ||
       'ideal-ofertas',
+    renotify: true,
     data: {
       url:
         data.url ||
@@ -97,13 +103,18 @@ messaging.onBackgroundMessage(payload => {
     }
   };
 
+  /*
+   * MASTER 9.7.2.6
+   * Exibe manualmente TODA mensagem recebida em segundo plano.
+   * Isso cobre inclusive a mensagem de teste enviada pelo Firebase Console.
+   */
   return self.registration.showNotification(
     title,
     options
   );
 });
 
-const CACHE_NAME = 'ideal-ofertas-pwa-shell-v4-push-unificado';
+const CACHE_NAME = 'ideal-ofertas-pwa-shell-v5-push-background';
 
 const STATIC_FILES = [
   './',
