@@ -376,12 +376,63 @@
         btnPush.textContent = 'Ativando...';
 
         /*
-         * A API atual do Firebase registra a instalação e retorna um
-         * Firebase Installation ID (FID) através de onRegistered().
-         * Esse FID será salvo na planilha na próxima etapa (MASTER 9.7.3).
+         * CORREÇÃO MASTER 9.7.2.1
+         *
+         * O PWA está hospedado dentro da pasta /ideal-ofertas-pwa/ no
+         * GitHub Pages. O Firebase, quando deixado no modo automático,
+         * procura firebase-messaging-sw.js na raiz do domínio.
+         *
+         * Registramos explicitamente o Service Worker que está dentro da
+         * pasta do PWA e entregamos essa inscrição ao Firebase.
          */
+        const fcmSwRegistration =
+          await navigator.serviceWorker.register(
+            './firebase-messaging-sw.js?v=973',
+            {
+              scope: './firebase-cloud-messaging-push-scope/'
+            }
+          );
+
+        /*
+         * Aguarda o Service Worker ficar ativo antes de criar a inscrição
+         * de Push. Isso evita o erro "no active Service Worker".
+         */
+        if(!fcmSwRegistration.active){
+          await new Promise((resolve, reject) => {
+            const sw =
+              fcmSwRegistration.installing ||
+              fcmSwRegistration.waiting;
+
+            if(!sw){
+              resolve();
+              return;
+            }
+
+            const timer = setTimeout(() => {
+              reject(new Error(
+                'Tempo excedido aguardando o Service Worker de notificações.'
+              ));
+            }, 15000);
+
+            sw.addEventListener('statechange', () => {
+              if(sw.state === 'activated'){
+                clearTimeout(timer);
+                resolve();
+              }
+
+              if(sw.state === 'redundant'){
+                clearTimeout(timer);
+                reject(new Error(
+                  'O Service Worker de notificações foi rejeitado pelo navegador.'
+                ));
+              }
+            });
+          });
+        }
+
         await register(messaging, {
-          vapidKey: VAPID_PUBLIC_KEY
+          vapidKey: VAPID_PUBLIC_KEY,
+          serviceWorkerRegistration: fcmSwRegistration
         });
 
         mostrarMensagemPush(
@@ -391,8 +442,14 @@
       }catch(err){
         console.error('IDEAL Push — erro ao ativar:', err);
 
+        const detalhe =
+          (err && (err.code || err.message))
+            ? String(err.code || err.message)
+            : 'erro desconhecido';
+
         mostrarMensagemPush(
-          'Não foi possível ativar as notificações. Tente novamente.'
+          'Não foi possível ativar as notificações. Detalhe: ' + detalhe,
+          12000
         );
 
       }finally{
