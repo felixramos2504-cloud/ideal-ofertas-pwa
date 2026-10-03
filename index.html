@@ -252,7 +252,6 @@
     import {
       getMessaging,
       getToken,
-      deleteToken,
       isSupported,
       onMessage
     } from
@@ -275,11 +274,9 @@
      * A versão anterior usava um segundo Service Worker em uma subpasta.
      * Agora o Firebase usa o mesmo Service Worker que controla o PWA.
      */
-    const IDEAL_PUSH_VERSION = '9.7.2.7';
+    const IDEAL_PUSH_VERSION = '9.7.2.8';
 
     if(localStorage.getItem('idealPushVersion') !== IDEAL_PUSH_VERSION){
-      localStorage.removeItem('idealFcmToken');
-      localStorage.removeItem('idealFcmTokenAtualizadoEm');
       localStorage.setItem('idealPushVersion', IDEAL_PUSH_VERSION);
     }
 
@@ -473,29 +470,6 @@
         btnPush.textContent = 'Ativando...';
 
         /*
-         * MASTER 9.7.2.7 — RESET COMPLETO DA INSCRIÇÃO PUSH
-         *
-         * A mensagem chega quando o app está aberto, mas não acorda o
-         * Service Worker em segundo plano. Isso normalmente indica que
-         * o token ficou associado a uma inscrição antiga.
-         *
-         * Nesta correção removemos explicitamente o token/subscrição
-         * anterior e criamos uma nova inscrição ligada ao Service Worker
-         * atual do PWA.
-         */
-        try{
-          await deleteToken(messaging);
-        }catch(resetErr){
-          console.warn(
-            'IDEAL Push — não havia token anterior para excluir:',
-            resetErr
-          );
-        }
-
-        localStorage.removeItem('idealFcmToken');
-        localStorage.removeItem('idealFcmTokenAtualizadoEm');
-
-        /*
          * MASTER 9.7.2.4 — SERVICE WORKER ÚNICO
          *
          * O mesmo service-worker.js que controla o PWA também passa
@@ -523,7 +497,7 @@
          */
         const appRegistration =
           await navigator.serviceWorker.register(
-            './service-worker.js?v=979',
+            './service-worker.js?v=980',
             {
               scope: './',
               updateViaCache: 'none'
@@ -598,6 +572,30 @@
      * Quando o app estiver aberto, o Firebase entrega a mensagem para
      * onMessage(). Mostramos um aviso dentro do próprio PWA.
      */
+
+    /*
+     * MASTER 9.7.2.8 — RECEBIMENTO NATIVO DO SERVICE WORKER
+     * O Service Worker encaminha a mensagem para a página quando o app
+     * estiver visível. Isso elimina a dependência do handler de background
+     * do SDK do Firebase dentro do Service Worker.
+     */
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.addEventListener('message', event => {
+        const mensagem = event.data || {};
+
+        if(mensagem.type !== 'IDEAL_PUSH'){
+          return;
+        }
+
+        console.log(
+          'IDEAL Push — mensagem nativa recebida:',
+          mensagem.payload
+        );
+
+        mostrarToastPush(mensagem.payload || {});
+      });
+    }
+
     onMessage(messaging, (payload) => {
       console.log(
         'IDEAL Push — mensagem em primeiro plano:',
