@@ -1,120 +1,15 @@
 /* =========================================================
-   IDEAL SUPERMERCADOS — MASTER 9.7.2.6
-   PWA + FIREBASE CLOUD MESSAGING NO MESMO SERVICE WORKER
+   IDEAL SUPERMERCADOS — MASTER 9.7.2.8
+   PUSH NATIVO + PWA
+   =========================================================
+
+   Esta versão não depende do Firebase Messaging SDK dentro
+   do Service Worker. O token FCM continua sendo criado pelo
+   Firebase no index.html, mas a entrega em segundo plano é
+   tratada diretamente pelo evento nativo "push".
    ========================================================= */
 
-/*
- * IMPORTANTE:
- * O manipulador de clique é registrado antes das bibliotecas do Firebase,
- * conforme orientação do Firebase para comportamento personalizado.
- */
-self.addEventListener('notificationclick', event => {
-  event.notification.close();
-
-  const destino =
-    (event.notification &&
-     event.notification.data &&
-     event.notification.data.url)
-      ? event.notification.data.url
-      : './';
-
-  event.waitUntil(
-    clients.matchAll({
-      type: 'window',
-      includeUncontrolled: true
-    }).then(lista => {
-      for(const client of lista){
-        if('focus' in client){
-          if('navigate' in client){
-            client.navigate(destino);
-          }
-          return client.focus();
-        }
-      }
-
-      if(clients.openWindow){
-        return clients.openWindow(destino);
-      }
-    })
-  );
-});
-
-importScripts(
-  'https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js'
-);
-
-importScripts(
-  'https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging-compat.js'
-);
-
-firebase.initializeApp({
-  apiKey: "AIzaSyCxNq9yO7JhXn9PHqgAMdls5Cb89yq2tv0",
-  authDomain: "ideal-ofertas.firebaseapp.com",
-  projectId: "ideal-ofertas",
-  storageBucket: "ideal-ofertas.firebasestorage.app",
-  messagingSenderId: "554998916130",
-  appId: "1:554998916130:web:ce65e917617d036f89167b"
-});
-
-const messaging = firebase.messaging();
-
-/*
- * Mensagens do tipo "notification" enviadas pelo Firebase Console
- * são exibidas automaticamente pelo SDK quando o PWA está em segundo plano.
- *
- * Para futuras mensagens "data-only" enviadas pelo nosso Apps Script,
- * este bloco cria a notificação manualmente.
- */
-messaging.onBackgroundMessage(payload => {
-  console.log(
-    '[IDEAL Push] Mensagem recebida em segundo plano:',
-    payload
-  );
-
-  const notification =
-    (payload && payload.notification) || {};
-
-  const data =
-    (payload && payload.data) || {};
-
-  const title =
-    notification.title ||
-    data.title ||
-    'IDEAL Supermercados';
-
-  const options = {
-    body:
-      notification.body ||
-      data.body ||
-      'Você recebeu uma nova atualização.',
-    icon:
-      notification.icon ||
-      data.icon ||
-      './icon-192.png',
-    badge: './icon-192.png',
-    tag:
-      data.tag ||
-      'ideal-ofertas',
-    renotify: true,
-    data: {
-      url:
-        data.url ||
-        './'
-    }
-  };
-
-  /*
-   * MASTER 9.7.2.6
-   * Exibe manualmente TODA mensagem recebida em segundo plano.
-   * Isso cobre inclusive a mensagem de teste enviada pelo Firebase Console.
-   */
-  return self.registration.showNotification(
-    title,
-    options
-  );
-});
-
-const CACHE_NAME = 'ideal-ofertas-pwa-shell-v5-push-background';
+const CACHE_NAME = 'ideal-ofertas-pwa-shell-v6-push-nativo';
 
 const STATIC_FILES = [
   './',
@@ -125,6 +20,10 @@ const STATIC_FILES = [
   './icon-maskable-192.png',
   './icon-maskable-512.png'
 ];
+
+/* =========================
+   INSTALAÇÃO / ATIVAÇÃO
+   ========================= */
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -138,33 +37,202 @@ self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
       .then(keys => Promise.all(
-        keys.map(key => key === CACHE_NAME ? Promise.resolve() : caches.delete(key))
+        keys.map(key =>
+          key === CACHE_NAME
+            ? Promise.resolve()
+            : caches.delete(key)
+        )
       ))
       .then(() => self.clients.claim())
   );
 });
 
-self.addEventListener('fetch', event => {
-  const req = event.request;
-  if (req.method !== 'GET') return;
+/* =========================
+   PUSH NATIVO
+   ========================= */
 
-  const url = new URL(req.url);
-
-  // Não interfere no Google Apps Script carregado no iframe.
-  if (
-    url.hostname.includes('script.google.com') ||
-    url.hostname.includes('googleusercontent.com')
-  ) {
+self.addEventListener('push', event => {
+  if(!event.data){
     return;
   }
 
-  if (url.origin !== self.location.origin) return;
+  event.waitUntil(
+    (async () => {
+      let payload = {};
+
+      try{
+        payload = event.data.json() || {};
+      }catch(err){
+        console.error(
+          '[IDEAL Push] Não foi possível ler o payload JSON:',
+          err
+        );
+
+        try{
+          payload = {
+            notification: {
+              title: 'IDEAL Supermercados',
+              body: event.data.text()
+            }
+          };
+        }catch(_){
+          payload = {};
+        }
+      }
+
+      console.log(
+        '[IDEAL Push] Evento PUSH recebido:',
+        payload
+      );
+
+      /*
+       * Se houver uma janela visível do PWA, encaminha a mensagem
+       * para o index.html mostrar o aviso dentro do aplicativo.
+       */
+      const lista =
+        await self.clients.matchAll({
+          type: 'window',
+          includeUncontrolled: true
+        });
+
+      const visiveis =
+        lista.filter(client =>
+          client.visibilityState === 'visible'
+        );
+
+      if(visiveis.length){
+        visiveis.forEach(client => {
+          client.postMessage({
+            type: 'IDEAL_PUSH',
+            payload
+          });
+        });
+
+        return;
+      }
+
+      /*
+       * Sem janela visível: mostra a notificação do sistema.
+       */
+      const notification =
+        payload.notification || {};
+
+      const data =
+        payload.data || {};
+
+      const fcmOptions =
+        payload.fcmOptions ||
+        payload.fcm_options ||
+        {};
+
+      const title =
+        notification.title ||
+        data.title ||
+        'IDEAL Supermercados';
+
+      const body =
+        notification.body ||
+        data.body ||
+        'Você recebeu uma nova atualização.';
+
+      const url =
+        fcmOptions.link ||
+        notification.click_action ||
+        data.url ||
+        './';
+
+      const options = {
+        body,
+        icon:
+          notification.icon ||
+          data.icon ||
+          './icon-192.png',
+        badge: './icon-192.png',
+        tag:
+          data.tag ||
+          'ideal-ofertas',
+        renotify: true,
+        data: { url }
+      };
+
+      await self.registration.showNotification(
+        title,
+        options
+      );
+    })()
+  );
+});
+
+/* =========================
+   CLIQUE NA NOTIFICAÇÃO
+   ========================= */
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+
+  const destino =
+    event.notification &&
+    event.notification.data &&
+    event.notification.data.url
+      ? event.notification.data.url
+      : './';
+
+  event.waitUntil(
+    self.clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    }).then(lista => {
+      for(const client of lista){
+        if('focus' in client){
+          if('navigate' in client){
+            client.navigate(destino);
+          }
+          return client.focus();
+        }
+      }
+
+      if(self.clients.openWindow){
+        return self.clients.openWindow(destino);
+      }
+    })
+  );
+});
+
+/* =========================
+   CACHE / REDE
+   ========================= */
+
+self.addEventListener('fetch', event => {
+  const req = event.request;
+
+  if(req.method !== 'GET'){
+    return;
+  }
+
+  const url = new URL(req.url);
+
+  /*
+   * Não interfere no Google Apps Script carregado no iframe.
+   */
+  if(
+    url.hostname.includes('script.google.com') ||
+    url.hostname.includes('googleusercontent.com')
+  ){
+    return;
+  }
+
+  if(url.origin !== self.location.origin){
+    return;
+  }
 
   event.respondWith(
     fetch(req)
       .then(res => {
         const clone = res.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(req, clone));
+
+        caches.open(CACHE_NAME)
+          .then(cache => cache.put(req, clone));
+
         return res;
       })
       .catch(() => caches.match(req))
