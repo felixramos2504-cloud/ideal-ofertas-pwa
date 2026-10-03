@@ -189,7 +189,7 @@
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js', { scope: './' })
+        navigator.serviceWorker.register('./service-worker.js?v=981', { scope: './', updateViaCache: 'none' })
           .then(reg => console.log('IDEAL PWA ativo:', reg.scope))
           .catch(err => console.error('Erro Service Worker:', err));
       });
@@ -251,7 +251,8 @@
 
     import {
       getMessaging,
-      getToken,
+      register,
+      onRegistered,
       isSupported,
       onMessage
     } from
@@ -274,9 +275,11 @@
      * A versão anterior usava um segundo Service Worker em uma subpasta.
      * Agora o Firebase usa o mesmo Service Worker que controla o PWA.
      */
-    const IDEAL_PUSH_VERSION = '9.7.2.8';
+    const IDEAL_PUSH_VERSION = '9.7.2.9';
 
     if(localStorage.getItem('idealPushVersion') !== IDEAL_PUSH_VERSION){
+      localStorage.removeItem('idealFcmFid');
+      localStorage.removeItem('idealFcmFidAtualizadoEm');
       localStorage.setItem('idealPushVersion', IDEAL_PUSH_VERSION);
     }
 
@@ -303,12 +306,12 @@
           ? Notification.permission
           : 'unsupported';
 
-      const token = localStorage.getItem('idealFcmToken') || '';
+      const fid = localStorage.getItem('idealFcmFid') || '';
 
       btnPush.classList.remove('ativo', 'bloqueado');
 
-      if(permissao === 'granted' && token){
-        btnPush.textContent = '📋 Copiar token FCM';
+      if(permissao === 'granted' && fid){
+        btnPush.textContent = '📋 Copiar ID Firebase';
         btnPush.classList.add('ativo');
         return;
       }
@@ -321,7 +324,7 @@
 
       btnPush.textContent =
         permissao === 'granted'
-          ? '🔄 Reconfigurar notificações'
+          ? '🔔 Ativar notificações'
           : '🔔 Ativar notificações';
     }
 
@@ -350,21 +353,21 @@
 
 
     async function copiarTokenPush(){
-      const token = localStorage.getItem('idealFcmToken') || '';
+      const fid = localStorage.getItem('idealFcmFid') || '';
 
-      if(!token){
+      if(!fid){
         mostrarMensagemPush(
-          'O token FCM ainda não foi gerado. Toque novamente para registrar o aparelho.'
+          'O ID Firebase ainda não foi gerado. Toque novamente para registrar o aparelho.'
         );
         return false;
       }
 
       try{
         if(navigator.clipboard && navigator.clipboard.writeText){
-          await navigator.clipboard.writeText(token);
+          await navigator.clipboard.writeText(fid);
         }else{
           const campo = document.createElement('textarea');
-          campo.value = token;
+          campo.value = fid;
           campo.setAttribute('readonly', '');
           campo.style.position = 'fixed';
           campo.style.opacity = '0';
@@ -375,54 +378,17 @@
         }
 
         mostrarMensagemPush(
-          '✅ Token FCM copiado. Testando também uma notificação local...'
+          '✅ ID Firebase copiado. Cole este ID na janela de teste do Firebase.'
         );
-
-        /*
-         * MASTER 9.7.2.5 — DIAGNÓSTICO
-         * Testa diretamente a capacidade do Service Worker/PWA de exibir
-         * uma notificação do sistema, sem depender do Firebase.
-         */
-        try{
-          const reg = await navigator.serviceWorker.ready;
-
-          await reg.showNotification(
-            'IDEAL Supermercados',
-            {
-              body: 'Teste local de notificação do aplicativo IDEAL',
-              icon: './icon-192.png',
-              badge: './icon-192.png',
-              tag: 'ideal-teste-local',
-              renotify: true,
-              data: { url: './' }
-            }
-          );
-
-          mostrarMensagemPush(
-            '✅ Token copiado. O teste local foi enviado para a barra de notificações.'
-          );
-
-        }catch(localErr){
-          console.error(
-            'IDEAL Push — erro no teste local:',
-            localErr
-          );
-
-          mostrarMensagemPush(
-            'Token copiado, mas o teste local falhou: ' +
-            String(localErr && (localErr.message || localErr.code) || localErr),
-            12000
-          );
-        }
 
         return true;
 
       }catch(err){
-        console.error('IDEAL Push — erro ao copiar token FCM:', err);
+        console.error('IDEAL Push — erro ao copiar ID Firebase:', err);
 
         window.prompt(
-          'Copie este token FCM:',
-          token
+          'Copie este ID Firebase:',
+          fid
         );
 
         return true;
@@ -497,7 +463,7 @@
          */
         const appRegistration =
           await navigator.serviceWorker.register(
-            './service-worker.js?v=980',
+            './service-worker.js?v=981',
             {
               scope: './',
               updateViaCache: 'none'
@@ -522,27 +488,75 @@
             ? appRegistration
             : await navigator.serviceWorker.ready;
 
-        const currentToken = await getToken(messaging, {
+        /*
+         * MASTER 9.7.2.9 — API ATUAL DO FIREBASE
+         *
+         * O Firebase recomenda register() + onRegistered().
+         * O identificador retornado agora é o Firebase Installation ID (FID).
+         * O mesmo Service Worker principal do PWA é informado explicitamente.
+         */
+        let fidRecebido = '';
+
+        const aguardarFid = new Promise((resolve, reject) => {
+          let finalizado = false;
+
+          const cancelar = onRegistered(messaging, (installationId) => {
+            if(finalizado){
+              return;
+            }
+
+            finalizado = true;
+            fidRecebido = installationId || '';
+
+            try{
+              cancelar();
+            }catch(_){}
+
+            resolve(fidRecebido);
+          });
+
+          setTimeout(() => {
+            if(finalizado){
+              return;
+            }
+
+            finalizado = true;
+
+            try{
+              cancelar();
+            }catch(_){}
+
+            reject(
+              new Error(
+                'O Firebase não retornou o ID de instalação dentro do tempo esperado.'
+              )
+            );
+          }, 15000);
+        });
+
+        await register(messaging, {
           vapidKey: VAPID_PUBLIC_KEY,
           serviceWorkerRegistration: appSwRegistration
         });
 
-        if(!currentToken){
+        const currentFid = await aguardarFid;
+
+        if(!currentFid){
           throw new Error(
-            'O Firebase não retornou um token FCM para este aparelho.'
+            'O Firebase não retornou um ID de instalação para este aparelho.'
           );
         }
 
-        localStorage.setItem('idealFcmToken', currentToken);
+        localStorage.setItem('idealFcmFid', currentFid);
         localStorage.setItem(
-          'idealFcmTokenAtualizadoEm',
+          'idealFcmFidAtualizadoEm',
           new Date().toISOString()
         );
 
         atualizarBotaoPush();
 
         mostrarMensagemPush(
-          '✅ Push reconfigurado. Novo token FCM gerado com sucesso.'
+          '✅ Notificações registradas. Novo ID Firebase gerado com sucesso.'
         );
 
       }catch(err){
@@ -606,12 +620,12 @@
     });
 
     btnPush.addEventListener('click', async () => {
-      const token = localStorage.getItem('idealFcmToken') || '';
+      const fid = localStorage.getItem('idealFcmFid') || '';
 
       if(
         'Notification' in window &&
         Notification.permission === 'granted' &&
-        token
+        fid
       ){
         await copiarTokenPush();
         return;
