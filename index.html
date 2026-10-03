@@ -269,6 +269,19 @@
     const VAPID_PUBLIC_KEY =
       "BFqbS_rj0lihvZnpl3n6RBf58k1U5S8i96ziLKok2d19uuV8oo1hv6utVLz2KIUaJYKkdaYpHzuw0T1dVK4_2Mw";
 
+    /*
+     * MASTER 9.7.2.4 — PUSH UNIFICADO
+     * A versão anterior usava um segundo Service Worker em uma subpasta.
+     * Agora o Firebase usa o mesmo Service Worker que controla o PWA.
+     */
+    const IDEAL_PUSH_VERSION = '9.7.2.4';
+
+    if(localStorage.getItem('idealPushVersion') !== IDEAL_PUSH_VERSION){
+      localStorage.removeItem('idealFcmToken');
+      localStorage.removeItem('idealFcmTokenAtualizadoEm');
+      localStorage.setItem('idealPushVersion', IDEAL_PUSH_VERSION);
+    }
+
     const btnPush = document.getElementById('btnPush');
     const pushMsg = document.getElementById('pushMsg');
     const pushToast = document.getElementById('pushToast');
@@ -419,56 +432,46 @@
         btnPush.textContent = 'Ativando...';
 
         /*
-         * MASTER 9.7.2.3 — CORREÇÃO PARA GITHUB PAGES EM SUBPASTA
+         * MASTER 9.7.2.4 — SERVICE WORKER ÚNICO
          *
-         * O PWA está em /ideal-ofertas-pwa/. Para não depender de um
-         * firebase-messaging-sw.js na raiz do domínio github.io,
-         * usamos getToken() com um Service Worker informado explicitamente.
+         * O mesmo service-worker.js que controla o PWA também passa
+         * a receber as mensagens do Firebase. Isso evita a separação
+         * entre o PWA instalado e o Worker usado para Push.
          */
-        const fcmSwRegistration =
-          await navigator.serviceWorker.register(
-            './firebase-messaging-sw.js?v=975',
-            {
-              scope: './firebase-cloud-messaging-push-scope/'
-            }
-          );
 
-        if(!fcmSwRegistration.active){
-          await new Promise((resolve, reject) => {
-            const sw =
-              fcmSwRegistration.installing ||
-              fcmSwRegistration.waiting;
+        /* Remove somente o Worker secundário das versões anteriores. */
+        const registrations =
+          await navigator.serviceWorker.getRegistrations();
 
-            if(!sw){
-              resolve();
-              return;
-            }
-
-            const timer = setTimeout(() => {
-              reject(new Error(
-                'Tempo excedido aguardando o Service Worker de notificações.'
-              ));
-            }, 15000);
-
-            sw.addEventListener('statechange', () => {
-              if(sw.state === 'activated'){
-                clearTimeout(timer);
-                resolve();
-              }
-
-              if(sw.state === 'redundant'){
-                clearTimeout(timer);
-                reject(new Error(
-                  'O Service Worker de notificações foi rejeitado pelo navegador.'
-                ));
-              }
-            });
-          });
+        for(const reg of registrations){
+          if(
+            reg.scope &&
+            reg.scope.includes(
+              '/firebase-cloud-messaging-push-scope/'
+            )
+          ){
+            await reg.unregister();
+          }
         }
+
+        /*
+         * Registra/atualiza o Service Worker principal do PWA.
+         */
+        await navigator.serviceWorker.register(
+          './service-worker.js?v=976',
+          { scope: './' }
+        );
+
+        /*
+         * navigator.serviceWorker.ready devolve o Worker ativo que
+         * efetivamente controla o PWA instalado.
+         */
+        const appSwRegistration =
+          await navigator.serviceWorker.ready;
 
         const currentToken = await getToken(messaging, {
           vapidKey: VAPID_PUBLIC_KEY,
-          serviceWorkerRegistration: fcmSwRegistration
+          serviceWorkerRegistration: appSwRegistration
         });
 
         if(!currentToken){
