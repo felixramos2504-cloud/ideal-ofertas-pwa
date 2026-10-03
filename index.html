@@ -298,7 +298,7 @@
       btnPush.classList.remove('ativo', 'bloqueado');
 
       if(permissao === 'granted' && fid){
-        btnPush.textContent = '🔔 Notificações ativas';
+        btnPush.textContent = '📋 Copiar ID de notificação';
         btnPush.classList.add('ativo');
         return;
       }
@@ -333,6 +333,50 @@
       window.__idealPushToastTimer = window.setTimeout(() => {
         pushToast.style.display = 'none';
       }, 7000);
+    }
+
+
+    async function copiarFidPush(){
+      const fid = localStorage.getItem('idealFcmFid') || '';
+
+      if(!fid){
+        mostrarMensagemPush(
+          'O ID de notificação ainda não foi gerado. Toque novamente para registrar o aparelho.'
+        );
+        return false;
+      }
+
+      try{
+        if(navigator.clipboard && navigator.clipboard.writeText){
+          await navigator.clipboard.writeText(fid);
+        }else{
+          const campo = document.createElement('textarea');
+          campo.value = fid;
+          campo.setAttribute('readonly', '');
+          campo.style.position = 'fixed';
+          campo.style.opacity = '0';
+          document.body.appendChild(campo);
+          campo.select();
+          document.execCommand('copy');
+          campo.remove();
+        }
+
+        mostrarMensagemPush(
+          '✅ ID de notificação copiado. Agora cole esse ID no Firebase.'
+        );
+
+        return true;
+
+      }catch(err){
+        console.error('IDEAL Push — erro ao copiar FID:', err);
+
+        window.prompt(
+          'Copie este ID de notificação:',
+          fid
+        );
+
+        return true;
+      }
     }
 
     async function iniciarPush(){
@@ -387,7 +431,7 @@
          */
         const fcmSwRegistration =
           await navigator.serviceWorker.register(
-            './firebase-messaging-sw.js?v=973',
+            './firebase-messaging-sw.js?v=974',
             {
               scope: './firebase-cloud-messaging-push-scope/'
             }
@@ -499,7 +543,20 @@
       mostrarToastPush(payload);
     });
 
-    btnPush.addEventListener('click', iniciarPush);
+    btnPush.addEventListener('click', async () => {
+      const fid = localStorage.getItem('idealFcmFid') || '';
+
+      if(
+        'Notification' in window &&
+        Notification.permission === 'granted' &&
+        fid
+      ){
+        await copiarFidPush();
+        return;
+      }
+
+      await iniciarPush();
+    });
 
     atualizarBotaoPush();
   </script>
