@@ -374,8 +374,45 @@
         }
 
         mostrarMensagemPush(
-          '✅ Token FCM copiado. Agora cole esse token no Firebase.'
+          '✅ Token FCM copiado. Testando também uma notificação local...'
         );
+
+        /*
+         * MASTER 9.7.2.5 — DIAGNÓSTICO
+         * Testa diretamente a capacidade do Service Worker/PWA de exibir
+         * uma notificação do sistema, sem depender do Firebase.
+         */
+        try{
+          const reg = await navigator.serviceWorker.ready;
+
+          await reg.showNotification(
+            'IDEAL Supermercados',
+            {
+              body: 'Teste local de notificação do aplicativo IDEAL',
+              icon: './icon-192.png',
+              badge: './icon-192.png',
+              tag: 'ideal-teste-local',
+              renotify: true,
+              data: { url: './' }
+            }
+          );
+
+          mostrarMensagemPush(
+            '✅ Token copiado. O teste local foi enviado para a barra de notificações.'
+          );
+
+        }catch(localErr){
+          console.error(
+            'IDEAL Push — erro no teste local:',
+            localErr
+          );
+
+          mostrarMensagemPush(
+            'Token copiado, mas o teste local falhou: ' +
+            String(localErr && (localErr.message || localErr.code) || localErr),
+            12000
+          );
+        }
 
         return true;
 
@@ -458,7 +495,7 @@
          * Registra/atualiza o Service Worker principal do PWA.
          */
         await navigator.serviceWorker.register(
-          './service-worker.js?v=976',
+          './service-worker.js?v=977',
           { scope: './' }
         );
 
