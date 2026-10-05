@@ -2,37 +2,35 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Diagnóstico Push IDEAL</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Diagnóstico Push IDEAL 2</title>
   <style>
     body{
-      font-family: Arial, sans-serif;
       margin:0;
-      padding:20px;
-      background:#f5f5f5;
+      padding:18px;
+      font-family:Arial,sans-serif;
+      background:#f4f4f4;
       color:#222;
     }
     .box{
-      max-width:760px;
-      margin:0 auto;
-      background:#fff;
-      border-radius:16px;
+      max-width:820px;
+      margin:auto;
       padding:20px;
-      box-shadow:0 4px 16px rgba(0,0,0,.10);
+      border-radius:16px;
+      background:#fff;
+      box-shadow:0 4px 16px rgba(0,0,0,.12);
     }
     h1{font-size:22px;margin-top:0}
     button{
-      width:100%;
-      padding:14px;
       border:0;
       border-radius:10px;
-      font-size:16px;
+      padding:13px 16px;
+      margin:4px 4px 12px 0;
       font-weight:700;
-      background:#d71920;
-      color:#fff;
       cursor:pointer;
-      margin-bottom:14px;
     }
+    #ler{background:#d71920;color:#fff}
+    #limpar{background:#ddd;color:#222}
     pre{
       white-space:pre-wrap;
       word-break:break-word;
@@ -40,179 +38,174 @@
       color:#fff;
       padding:14px;
       border-radius:10px;
-      min-height:160px;
-      font-size:13px;
+      min-height:220px;
       line-height:1.45;
+      font-size:13px;
     }
-    .ok{color:#166534;font-weight:700}
-    .aviso{color:#92400e;font-weight:700}
   </style>
 </head>
 <body>
 <div class="box">
-  <h1>Diagnóstico Push — IDEAL</h1>
-  <p>Este arquivo apenas verifica o Service Worker e a inscrição Push. Ele não altera nenhuma configuração.</p>
-  <button id="btn">Executar diagnóstico</button>
-  <pre id="saida">Toque em "Executar diagnóstico".</pre>
+  <h1>Diagnóstico Push — IDEAL 9.7.2.10</h1>
+  <p>
+    Esta tela mostra se o Service Worker recebeu o Push enquanto
+    o aplicativo estava em segundo plano.
+  </p>
+
+  <button id="ler">Ler diagnóstico</button>
+  <button id="limpar">Limpar logs</button>
+
+  <pre id="saida">Toque em “Ler diagnóstico”.</pre>
 </div>
 
 <script>
+const DB = 'idealPushDiagnostico';
+const STORE = 'eventos';
 const saida = document.getElementById('saida');
-const btn = document.getElementById('btn');
 
-function linha(nome, valor){
-  return nome + ': ' + valor;
+function abrirDB(){
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB, 1);
+
+    req.onupgradeneeded = () => {
+      const db = req.result;
+
+      if(!db.objectStoreNames.contains(STORE)){
+        db.createObjectStore(
+          STORE,
+          {keyPath:'id', autoIncrement:true}
+        );
+      }
+    };
+
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
 }
 
-async function diagnosticar(){
-  btn.disabled = true;
-  saida.textContent = 'Verificando...';
-
-  const out = [];
+async function ler(){
+  const linhas = [];
 
   try{
-    out.push('=== IDEAL PUSH DIAGNÓSTICO 9.7.2.10 ===');
-    out.push(linha('Data', new Date().toLocaleString('pt-BR')));
-    out.push(linha('URL', location.href));
-    out.push(linha('Origem', location.origin));
-    out.push(linha(
-      'Modo instalado',
-      window.matchMedia('(display-mode: standalone)').matches ? 'SIM' : 'NÃO'
+    linhas.push('=== IDEAL PUSH DIAGNÓSTICO 9.7.2.10 ===');
+    linhas.push('Data: ' + new Date().toLocaleString('pt-BR'));
+    linhas.push('Permissão: ' + (
+      'Notification' in window
+        ? Notification.permission
+        : 'API indisponível'
     ));
 
-    out.push('');
-    out.push('=== PERMISSÃO ===');
+    linhas.push('');
+    linhas.push('=== SERVICE WORKER ===');
 
-    if('Notification' in window){
-      out.push(linha('Notification.permission', Notification.permission));
-    }else{
-      out.push('Notification API: NÃO SUPORTADA');
-    }
+    const regs =
+      'serviceWorker' in navigator
+        ? await navigator.serviceWorker.getRegistrations()
+        : [];
 
-    out.push('');
-    out.push('=== SERVICE WORKER ===');
-
-    if(!('serviceWorker' in navigator)){
-      out.push('Service Worker: NÃO SUPORTADO');
-      saida.textContent = out.join('\n');
-      return;
-    }
-
-    const controller = navigator.serviceWorker.controller;
-    out.push(linha(
-      'Controller atual',
-      controller ? controller.scriptURL : 'NENHUM'
-    ));
-    out.push(linha(
-      'Controller estado',
-      controller ? controller.state : '-'
-    ));
-
-    const regs = await navigator.serviceWorker.getRegistrations();
-    out.push(linha('Quantidade de registros', regs.length));
-
-    if(!regs.length){
-      out.push('ATENÇÃO: nenhum Service Worker registrado.');
-    }
+    linhas.push('Registros encontrados: ' + regs.length);
 
     for(let i=0;i<regs.length;i++){
-      const reg = regs[i];
+      const r = regs[i];
 
-      out.push('');
-      out.push('--- REGISTRO ' + (i+1) + ' ---');
-      out.push(linha('Scope', reg.scope));
-
-      if(reg.active){
-        out.push(linha('Active script', reg.active.scriptURL));
-        out.push(linha('Active state', reg.active.state));
-      }else{
-        out.push('Active script: NENHUM');
+      if(!r.scope.includes('/ideal-ofertas-pwa/')){
+        continue;
       }
 
-      if(reg.waiting){
-        out.push(linha('Waiting script', reg.waiting.scriptURL));
-        out.push(linha('Waiting state', reg.waiting.state));
-      }else{
-        out.push('Waiting script: nenhum');
-      }
+      linhas.push('Scope IDEAL: ' + r.scope);
+      linhas.push(
+        'Script ativo: ' +
+        (r.active ? r.active.scriptURL : 'NENHUM')
+      );
 
-      if(reg.installing){
-        out.push(linha('Installing script', reg.installing.scriptURL));
-        out.push(linha('Installing state', reg.installing.state));
-      }else{
-        out.push('Installing script: nenhum');
-      }
+      const sub = await r.pushManager.getSubscription();
 
-      try{
-        const sub = await reg.pushManager.getSubscription();
-
-        if(sub){
-          out.push('PushSubscription: SIM');
-          try{
-            const host = new URL(sub.endpoint).host;
-            out.push(linha('Push endpoint', host));
-          }catch(_){
-            out.push('Push endpoint: presente');
-          }
-
-          out.push(linha(
-            'Chave p256dh',
-            sub.getKey('p256dh') ? 'SIM' : 'NÃO'
-          ));
-          out.push(linha(
-            'Chave auth',
-            sub.getKey('auth') ? 'SIM' : 'NÃO'
-          ));
-        }else{
-          out.push('PushSubscription: NÃO');
-        }
-      }catch(err){
-        out.push('Erro ao consultar PushSubscription: ' + (err.message || err));
-      }
+      linhas.push(
+        'PushSubscription: ' +
+        (sub ? 'SIM' : 'NÃO')
+      );
     }
 
-    out.push('');
-    out.push('=== FIREBASE LOCAL ===');
-    out.push(linha(
-      'FID salvo',
-      localStorage.getItem('idealFcmFid') ? 'SIM' : 'NÃO'
-    ));
-    out.push(linha(
-      'Versão Push salva',
-      localStorage.getItem('idealPushVersion') || 'nenhuma'
-    ));
+    linhas.push('');
+    linhas.push('=== EVENTOS GRAVADOS ===');
 
-    out.push('');
-    out.push('=== LEITURA RÁPIDA ===');
+    const db = await abrirDB();
 
-    const idealReg = regs.find(r =>
-      r.scope.includes('/ideal-ofertas-pwa/')
-    ) || regs[0];
+    const eventos = await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).getAll();
 
-    if(!idealReg){
-      out.push('FALHA: não existe registro de Service Worker.');
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+
+    db.close();
+
+    if(!eventos.length){
+      linhas.push('Nenhum evento gravado.');
     }else{
-      const sub = await idealReg.pushManager.getSubscription();
+      eventos
+        .slice(-50)
+        .forEach(e => {
+          const d = new Date(e.data);
 
-      if(!idealReg.active){
-        out.push('FALHA: o Service Worker não está ativo.');
-      }else if(!sub){
-        out.push('FALHA: não existe PushSubscription ligada ao Service Worker.');
-      }else{
-        out.push('OK: Service Worker ativo + PushSubscription existente.');
-      }
+          linhas.push('');
+          linhas.push(
+            '#' + e.id +
+            ' | ' +
+            d.toLocaleString('pt-BR') +
+            ' | ' +
+            e.tipo
+          );
+
+          if(e.detalhe){
+            linhas.push(e.detalhe);
+          }
+        });
     }
+
+    linhas.push('');
+    linhas.push('=== COMO INTERPRETAR ===');
+    linhas.push(
+      'PUSH_RAW_RECEBIDO = o navegador acordou o Service Worker.'
+    );
+    linhas.push(
+      'FCM_BACKGROUND_RECEBIDO = o Firebase processou a mensagem em segundo plano.'
+    );
+    linhas.push(
+      'SHOW_NOTIFICATION_OK = o Service Worker pediu ao Android para mostrar a notificação.'
+    );
+
+    saida.textContent = linhas.join('\n');
 
   }catch(err){
-    out.push('');
-    out.push('ERRO GERAL: ' + (err && (err.stack || err.message) || err));
-  }finally{
-    saida.textContent = out.join('\n');
-    btn.disabled = false;
+    saida.textContent =
+      'ERRO:\n' +
+      String(err && (err.stack || err.message) || err);
   }
 }
 
-btn.addEventListener('click', diagnosticar);
+async function limpar(){
+  try{
+    const db = await abrirDB();
+
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      const req = tx.objectStore(STORE).clear();
+
+      req.onsuccess = resolve;
+      req.onerror = () => reject(req.error);
+    });
+
+    db.close();
+    saida.textContent = 'Logs apagados.';
+  }catch(err){
+    saida.textContent = 'Erro ao limpar: ' + String(err);
+  }
+}
+
+document.getElementById('ler').addEventListener('click', ler);
+document.getElementById('limpar').addEventListener('click', limpar);
 </script>
 </body>
 </html>
