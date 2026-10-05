@@ -1,9 +1,9 @@
 /* =========================================================
-   IDEAL SUPERMERCADOS — MASTER 9.7.2.9
+   IDEAL SUPERMERCADOS — MASTER 9.7.2.10 — DIAGNÓSTICO
    FIREBASE MESSAGING + PWA — FID
    ========================================================= */
 
-const CACHE_NAME = 'ideal-ofertas-pwa-shell-v7-fid';
+const CACHE_NAME = 'ideal-ofertas-pwa-shell-v8-diag';
 
 const STATIC_FILES = [
   './',
@@ -14,6 +14,96 @@ const STATIC_FILES = [
   './icon-maskable-192.png',
   './icon-maskable-512.png'
 ];
+
+/* =========================
+   DIAGNÓSTICO PERSISTENTE 9.7.2.10
+   ========================= */
+
+const IDEAL_DIAG_DB = 'idealPushDiagnostico';
+const IDEAL_DIAG_STORE = 'eventos';
+
+function abrirDiagDB(){
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDEAL_DIAG_DB, 1);
+
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if(!db.objectStoreNames.contains(IDEAL_DIAG_STORE)){
+        db.createObjectStore(
+          IDEAL_DIAG_STORE,
+          { keyPath: 'id', autoIncrement: true }
+        );
+      }
+    };
+
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function logDiag(tipo, detalhe){
+  try{
+    const db = await abrirDiagDB();
+
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(
+        IDEAL_DIAG_STORE,
+        'readwrite'
+      );
+
+      tx.objectStore(IDEAL_DIAG_STORE).add({
+        data: new Date().toISOString(),
+        tipo: String(tipo || ''),
+        detalhe:
+          typeof detalhe === 'string'
+            ? detalhe
+            : JSON.stringify(detalhe || {})
+      });
+
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+
+    db.close();
+  }catch(err){
+    console.error(
+      '[IDEAL Push][DIAG] Falha ao gravar log:',
+      err
+    );
+  }
+}
+
+self.addEventListener('push', event => {
+  let resumo = 'evento push sem payload';
+
+  try{
+    if(event.data){
+      resumo = event.data.text();
+      if(resumo.length > 2500){
+        resumo = resumo.slice(0, 2500) + '...';
+      }
+    }
+  }catch(err){
+    resumo = 'erro ao ler payload: ' + String(err);
+  }
+
+  event.waitUntil(
+    logDiag('PUSH_RAW_RECEBIDO', resumo)
+  );
+});
+
+self.addEventListener('pushsubscriptionchange', event => {
+  event.waitUntil(
+    logDiag(
+      'PUSH_SUBSCRIPTION_CHANGE',
+      {
+        antiga: !!event.oldSubscription,
+        nova: !!event.newSubscription
+      }
+    )
+  );
+});
 
 /*
  * O clique é registrado ANTES do Firebase, conforme orientação
@@ -74,6 +164,21 @@ const messaging = firebase.messaging();
  * O handler cria a notificação do sistema explicitamente.
  */
 messaging.onBackgroundMessage(payload => {
+  const resumo = {
+    notification:
+      payload && payload.notification
+        ? payload.notification
+        : null,
+    data:
+      payload && payload.data
+        ? payload.data
+        : null,
+    fcmOptions:
+      payload && payload.fcmOptions
+        ? payload.fcmOptions
+        : null
+  };
+
   console.log(
     '[IDEAL Push] Mensagem recebida em segundo plano:',
     payload
@@ -115,10 +220,41 @@ messaging.onBackgroundMessage(payload => {
     }
   };
 
-  return self.registration.showNotification(
-    title,
-    options
-  );
+  return (async () => {
+    await logDiag(
+      'FCM_BACKGROUND_RECEBIDO',
+      resumo
+    );
+
+    try{
+      await self.registration.showNotification(
+        title,
+        options
+      );
+
+      await logDiag(
+        'SHOW_NOTIFICATION_OK',
+        {
+          title,
+          body: options.body
+        }
+      );
+    }catch(err){
+      await logDiag(
+        'SHOW_NOTIFICATION_ERRO',
+        {
+          mensagem:
+            String(
+              err &&
+              (err.stack || err.message) ||
+              err
+            )
+        }
+      );
+
+      throw err;
+    }
+  })();
 });
 
 /* =========================
@@ -127,23 +263,41 @@ messaging.onBackgroundMessage(payload => {
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(STATIC_FILES))
-      .then(() => self.skipWaiting())
+    Promise.all([
+      logDiag(
+        'SW_INSTALL',
+        { cache: CACHE_NAME }
+      ),
+      caches.open(CACHE_NAME)
+        .then(cache => cache.addAll(STATIC_FILES))
+        .then(() => self.skipWaiting())
+    ])
   );
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(
+    (async () => {
+      await logDiag(
+        'SW_ACTIVATE',
+        {
+          cache: CACHE_NAME,
+          scriptURL: self.location.href
+        }
+      );
+
+      const keys = await caches.keys();
+
+      await Promise.all(
         keys.map(key =>
           key === CACHE_NAME
             ? Promise.resolve()
             : caches.delete(key)
         )
-      ))
-      .then(() => self.clients.claim())
+      );
+
+      await self.clients.claim();
+    })()
   );
 });
 
