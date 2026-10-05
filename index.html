@@ -272,7 +272,7 @@
     const VAPID_PUBLIC_KEY =
       "BFqbS_rj0lihvZnpl3n6RBf58k1U5S8i96ziLKok2d19uuV8oo1hv6utVLz2KIUaJYKkdaYpHzuw0T1dVK4_2Mw";
 
-    const IDEAL_PUSH_VERSION = '9.7.3';
+    const IDEAL_PUSH_VERSION = '9.7.3.1';
     const IDEAL_SW_URL = './service-worker.js?v=981';
 
     const btnPush =
@@ -301,6 +301,15 @@
 
     let ultimoTokenEnviado = '';
     let tokenConfirmadoBackend = '';
+
+    /*
+     * MASTER 9.7.3.1
+     * A janela real do HTML Service do Apps Script é descoberta
+     * por handshake, evitando problemas com iframes intermediários.
+     */
+    let ponteAppsScriptWindow = null;
+    let ponteAppsScriptOrigin = '';
+    let ponteAppsScriptPronta = false;
 
     function mostrarMensagemPush(texto, tempo = 6000){
       pushMsg.textContent = texto;
@@ -459,19 +468,14 @@
     function enviarTokenAoAppsScript(token){
       if(
         !token ||
-        !appFramePush ||
-        !appFramePush.contentWindow
+        !ponteAppsScriptPronta ||
+        !ponteAppsScriptWindow ||
+        !ponteAppsScriptOrigin
       ){
-        return;
+        return false;
       }
 
-      /*
-       * O iframe do Apps Script pode redirecionar para um domínio
-       * googleusercontent.com. Por isso o targetOrigin é "*".
-       * A segurança é feita do outro lado: o Index do Apps Script
-       * aceita somente event.origin do GitHub Pages oficial.
-       */
-      appFramePush.contentWindow.postMessage(
+      ponteAppsScriptWindow.postMessage(
         {
           type:
             'IDEAL_PUSH_REGISTRAR_TOKEN',
@@ -493,10 +497,16 @@
               'IDEAL_OFERTAS_PWA_GITHUB'
           }
         },
-        '*'
+        ponteAppsScriptOrigin
       );
 
       ultimoTokenEnviado = token;
+
+      console.log(
+        '[IDEAL Push 9.7.3.1] Token enviado para a ponte Apps Script.'
+      );
+
+      return true;
     }
 
     function cadastrarTokenComTentativas(
@@ -539,6 +549,47 @@
         const mensagem =
           event.data || {};
 
+        /*
+         * O Apps Script anuncia qual é a janela exata que consegue
+         * executar google.script.run. Guardamos event.source.
+         */
+        if(
+          mensagem.type ===
+          'IDEAL_PUSH_BRIDGE_READY'
+        ){
+          ponteAppsScriptWindow =
+            event.source;
+
+          ponteAppsScriptOrigin =
+            event.origin;
+
+          ponteAppsScriptPronta =
+            true;
+
+          console.log(
+            '[IDEAL Push 9.7.3.1] Ponte Apps Script pronta:',
+            event.origin
+          );
+
+          const token =
+            localStorage.getItem(
+              'idealFcmToken'
+            ) || '';
+
+          if(token){
+            window.setTimeout(
+              () => {
+                enviarTokenAoAppsScript(
+                  token
+                );
+              },
+              150
+            );
+          }
+
+          return;
+        }
+
         if(
           mensagem.type !==
           'IDEAL_PUSH_TOKEN_RESULTADO'
@@ -566,17 +617,31 @@
           );
 
           console.log(
-            '[IDEAL Push 9.7.3] Token confirmado na planilha:',
+            '[IDEAL Push 9.7.3.1] Token confirmado na planilha:',
             mensagem.resultado
+          );
+
+          mostrarMensagemPush(
+            '✅ Dispositivo cadastrado para receber notificações.',
+            5000
           );
 
           return;
         }
 
         console.warn(
-          '[IDEAL Push 9.7.3] Apps Script não salvou o token:',
+          '[IDEAL Push 9.7.3.1] Apps Script não salvou o token:',
           mensagem.erro ||
           'erro desconhecido'
+        );
+
+        mostrarMensagemPush(
+          'Não foi possível concluir o cadastro Push: ' +
+          (
+            mensagem.erro ||
+            'erro desconhecido'
+          ),
+          9000
         );
       }
     );
@@ -782,21 +847,17 @@
     appFramePush.addEventListener(
       'load',
       () => {
-        const token =
-          localStorage.getItem(
-            'idealFcmToken'
-          ) || '';
+        /*
+         * O Apps Script vai enviar IDEAL_PUSH_BRIDGE_READY
+         * quando sua página interna estiver realmente pronta.
+         */
+        ponteAppsScriptWindow = null;
+        ponteAppsScriptOrigin = '';
+        ponteAppsScriptPronta = false;
 
-        if(token){
-          window.setTimeout(
-            () => {
-              cadastrarTokenComTentativas(
-                token
-              );
-            },
-            700
-          );
-        }
+        console.log(
+          '[IDEAL Push 9.7.3.1] Iframe carregado; aguardando handshake.'
+        );
       }
     );
 
