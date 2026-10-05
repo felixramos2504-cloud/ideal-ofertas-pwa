@@ -244,15 +244,17 @@
     });
   </script>
 
-  <!-- MASTER 9.7.2 — FIREBASE CLOUD MESSAGING -->
+  <!-- ================================================================
+       IDEAL SUPERMERCADOS — MASTER 9.7.3
+       FCM TOKEN + CADASTRO AUTOMÁTICO NA PLANILHA PUSH_TOKENS
+       ================================================================ -->
   <script type="module">
     import { initializeApp } from
       'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
 
     import {
       getMessaging,
-      register,
-      onRegistered,
+      getToken,
       isSupported,
       onMessage
     } from
@@ -270,67 +272,56 @@
     const VAPID_PUBLIC_KEY =
       "BFqbS_rj0lihvZnpl3n6RBf58k1U5S8i96ziLKok2d19uuV8oo1hv6utVLz2KIUaJYKkdaYpHzuw0T1dVK4_2Mw";
 
-    /*
-     * MASTER 9.7.2.4 — PUSH UNIFICADO
-     * A versão anterior usava um segundo Service Worker em uma subpasta.
-     * Agora o Firebase usa o mesmo Service Worker que controla o PWA.
-     */
-    const IDEAL_PUSH_VERSION = '9.7.2.9';
+    const IDEAL_PUSH_VERSION = '9.7.3';
+    const IDEAL_SW_URL = './service-worker.js?v=981';
 
-    if(localStorage.getItem('idealPushVersion') !== IDEAL_PUSH_VERSION){
-      localStorage.removeItem('idealFcmFid');
-      localStorage.removeItem('idealFcmFidAtualizadoEm');
-      localStorage.setItem('idealPushVersion', IDEAL_PUSH_VERSION);
-    }
+    const btnPush =
+      document.getElementById('btnPush');
 
-    const btnPush = document.getElementById('btnPush');
-    const pushMsg = document.getElementById('pushMsg');
-    const pushToast = document.getElementById('pushToast');
-    const pushToastTitle = document.getElementById('pushToastTitle');
-    const pushToastBody = document.getElementById('pushToastBody');
+    const pushMsg =
+      document.getElementById('pushMsg');
+
+    const pushToast =
+      document.getElementById('pushToast');
+
+    const pushToastTitle =
+      document.getElementById('pushToastTitle');
+
+    const pushToastBody =
+      document.getElementById('pushToastBody');
+
+    const appFramePush =
+      document.getElementById('appFrame');
+
+    const app =
+      initializeApp(firebaseConfig);
+
+    const messaging =
+      getMessaging(app);
+
+    let ultimoTokenEnviado = '';
+    let tokenConfirmadoBackend = '';
 
     function mostrarMensagemPush(texto, tempo = 6000){
       pushMsg.textContent = texto;
       pushMsg.style.display = 'block';
 
-      window.clearTimeout(window.__idealPushMsgTimer);
+      window.clearTimeout(
+        window.__idealPushMsgTimer
+      );
 
-      window.__idealPushMsgTimer = window.setTimeout(() => {
-        pushMsg.style.display = 'none';
-      }, tempo);
-    }
-
-    function atualizarBotaoPush(){
-      const permissao =
-        ('Notification' in window)
-          ? Notification.permission
-          : 'unsupported';
-
-      const fid = localStorage.getItem('idealFcmFid') || '';
-
-      btnPush.classList.remove('ativo', 'bloqueado');
-
-      if(permissao === 'granted' && fid){
-        btnPush.textContent = '📋 Copiar ID Firebase';
-        btnPush.classList.add('ativo');
-        return;
-      }
-
-      if(permissao === 'denied'){
-        btnPush.textContent = '🔕 Notificações bloqueadas';
-        btnPush.classList.add('bloqueado');
-        return;
-      }
-
-      btnPush.textContent =
-        permissao === 'granted'
-          ? '🔔 Ativar notificações'
-          : '🔔 Ativar notificações';
+      window.__idealPushMsgTimer =
+        window.setTimeout(() => {
+          pushMsg.style.display = 'none';
+        }, tempo);
     }
 
     function mostrarToastPush(payload){
-      const notification = payload?.notification || {};
-      const data = payload?.data || {};
+      const notification =
+        payload?.notification || {};
+
+      const data =
+        payload?.data || {};
 
       pushToastTitle.textContent =
         notification.title ||
@@ -344,231 +335,399 @@
 
       pushToast.style.display = 'block';
 
-      window.clearTimeout(window.__idealPushToastTimer);
+      window.clearTimeout(
+        window.__idealPushToastTimer
+      );
 
-      window.__idealPushToastTimer = window.setTimeout(() => {
-        pushToast.style.display = 'none';
-      }, 7000);
+      window.__idealPushToastTimer =
+        window.setTimeout(() => {
+          pushToast.style.display = 'none';
+        }, 7000);
     }
 
+    function obterIdDispositivo(){
+      let id =
+        localStorage.getItem(
+          'idealPushDeviceId'
+        ) || '';
 
-    async function copiarTokenPush(){
-      const fid = localStorage.getItem('idealFcmFid') || '';
+      if(id){
+        return id;
+      }
 
-      if(!fid){
-        mostrarMensagemPush(
-          'O ID Firebase ainda não foi gerado. Toque novamente para registrar o aparelho.'
+      if(
+        window.crypto &&
+        typeof window.crypto.randomUUID === 'function'
+      ){
+        id = window.crypto.randomUUID();
+      }else{
+        id =
+          'ideal-' +
+          Date.now().toString(36) +
+          '-' +
+          Math.random()
+            .toString(36)
+            .slice(2, 12);
+      }
+
+      localStorage.setItem(
+        'idealPushDeviceId',
+        id
+      );
+
+      return id;
+    }
+
+    function plataformaAtual(){
+      try{
+        if(
+          navigator.userAgentData &&
+          navigator.userAgentData.platform
+        ){
+          return String(
+            navigator.userAgentData.platform
+          );
+        }
+      }catch(_){}
+
+      return String(
+        navigator.platform ||
+        'WEB/PWA'
+      );
+    }
+
+    function origemGoogleValida(origin){
+      try{
+        const host =
+          new URL(origin).hostname;
+
+        return (
+          host === 'script.google.com' ||
+          host === 'script.googleusercontent.com' ||
+          host.endsWith('.googleusercontent.com')
         );
+      }catch(_){
         return false;
       }
+    }
 
-      try{
-        if(navigator.clipboard && navigator.clipboard.writeText){
-          await navigator.clipboard.writeText(fid);
-        }else{
-          const campo = document.createElement('textarea');
-          campo.value = fid;
-          campo.setAttribute('readonly', '');
-          campo.style.position = 'fixed';
-          campo.style.opacity = '0';
-          document.body.appendChild(campo);
-          campo.select();
-          document.execCommand('copy');
-          campo.remove();
+    function atualizarBotaoPush(){
+      const permissao =
+        ('Notification' in window)
+          ? Notification.permission
+          : 'unsupported';
+
+      const token =
+        localStorage.getItem(
+          'idealFcmToken'
+        ) || '';
+
+      btnPush.classList.remove(
+        'ativo',
+        'bloqueado'
+      );
+
+      if(
+        permissao === 'granted' &&
+        token
+      ){
+        btnPush.textContent =
+          '🔔 Notificações ativas';
+
+        btnPush.classList.add('ativo');
+
+        return;
+      }
+
+      if(permissao === 'denied'){
+        btnPush.textContent =
+          '🔕 Notificações bloqueadas';
+
+        btnPush.classList.add(
+          'bloqueado'
+        );
+
+        return;
+      }
+
+      btnPush.textContent =
+        permissao === 'granted'
+          ? '🔔 Concluir notificações'
+          : '🔔 Ativar notificações';
+    }
+
+    function enviarTokenAoAppsScript(token){
+      if(
+        !token ||
+        !appFramePush ||
+        !appFramePush.contentWindow
+      ){
+        return;
+      }
+
+      /*
+       * O iframe do Apps Script pode redirecionar para um domínio
+       * googleusercontent.com. Por isso o targetOrigin é "*".
+       * A segurança é feita do outro lado: o Index do Apps Script
+       * aceita somente event.origin do GitHub Pages oficial.
+       */
+      appFramePush.contentWindow.postMessage(
+        {
+          type:
+            'IDEAL_PUSH_REGISTRAR_TOKEN',
+
+          payload: {
+            idDispositivo:
+              obterIdDispositivo(),
+
+            tokenFcm:
+              token,
+
+            plataforma:
+              plataformaAtual(),
+
+            userAgent:
+              navigator.userAgent || '',
+
+            origem:
+              'IDEAL_OFERTAS_PWA_GITHUB'
+          }
+        },
+        '*'
+      );
+
+      ultimoTokenEnviado = token;
+    }
+
+    function cadastrarTokenComTentativas(
+      token
+    ){
+      if(!token){
+        return;
+      }
+
+      const tentativas =
+        [0, 1000, 2500, 5000, 9000];
+
+      tentativas.forEach(tempo => {
+        window.setTimeout(() => {
+          if(
+            tokenConfirmadoBackend ===
+            token
+          ){
+            return;
+          }
+
+          enviarTokenAoAppsScript(
+            token
+          );
+        }, tempo);
+      });
+    }
+
+    window.addEventListener(
+      'message',
+      event => {
+        if(
+          !origemGoogleValida(
+            event.origin
+          )
+        ){
+          return;
         }
 
-        mostrarMensagemPush(
-          '✅ ID Firebase copiado. Cole este ID na janela de teste do Firebase.'
+        const mensagem =
+          event.data || {};
+
+        if(
+          mensagem.type !==
+          'IDEAL_PUSH_TOKEN_RESULTADO'
+        ){
+          return;
+        }
+
+        if(mensagem.ok){
+          const token =
+            localStorage.getItem(
+              'idealFcmToken'
+            ) || ultimoTokenEnviado;
+
+          tokenConfirmadoBackend =
+            token;
+
+          localStorage.setItem(
+            'idealPushTokenSalvoNaPlanilha',
+            token
+          );
+
+          localStorage.setItem(
+            'idealPushTokenSalvoEm',
+            new Date().toISOString()
+          );
+
+          console.log(
+            '[IDEAL Push 9.7.3] Token confirmado na planilha:',
+            mensagem.resultado
+          );
+
+          return;
+        }
+
+        console.warn(
+          '[IDEAL Push 9.7.3] Apps Script não salvou o token:',
+          mensagem.erro ||
+          'erro desconhecido'
         );
-
-        return true;
-
-      }catch(err){
-        console.error('IDEAL Push — erro ao copiar ID Firebase:', err);
-
-        window.prompt(
-          'Copie este ID Firebase:',
-          fid
-        );
-
-        return true;
       }
+    );
+
+    async function obterTokenFcm({
+      pedirPermissao = false,
+      mostrarSucesso = false
+    } = {}){
+      if(
+        !('Notification' in window) ||
+        !('serviceWorker' in navigator)
+      ){
+        throw new Error(
+          'Este navegador não oferece suporte às notificações necessárias.'
+        );
+      }
+
+      const suportado =
+        await isSupported();
+
+      if(!suportado){
+        throw new Error(
+          'Firebase Messaging não é compatível com este navegador.'
+        );
+      }
+
+      let permissao =
+        Notification.permission;
+
+      if(
+        pedirPermissao &&
+        permissao !== 'granted'
+      ){
+        permissao =
+          await Notification.requestPermission();
+      }
+
+      if(permissao !== 'granted'){
+        atualizarBotaoPush();
+
+        if(pedirPermissao){
+          mostrarMensagemPush(
+            permissao === 'denied'
+              ? 'As notificações estão bloqueadas nas permissões do navegador.'
+              : 'A permissão para notificações não foi concedida.'
+          );
+        }
+
+        return '';
+      }
+
+      const registration =
+        await navigator.serviceWorker.register(
+          IDEAL_SW_URL,
+          {
+            scope: './',
+            updateViaCache: 'none'
+          }
+        );
+
+      try{
+        await registration.update();
+      }catch(_){}
+
+      const swRegistration =
+        registration.active
+          ? registration
+          : await navigator.serviceWorker.ready;
+
+      /*
+       * MASTER 9.7.3:
+       * para registrar/enviar Push ao dispositivo usamos o
+       * FCM REGISTRATION TOKEN, validado no teste de background.
+       */
+      const token =
+        await getToken(
+          messaging,
+          {
+            vapidKey:
+              VAPID_PUBLIC_KEY,
+
+            serviceWorkerRegistration:
+              swRegistration
+          }
+        );
+
+      if(!token){
+        throw new Error(
+          'O Firebase não retornou o token FCM do aparelho.'
+        );
+      }
+
+      localStorage.setItem(
+        'idealFcmToken',
+        token
+      );
+
+      localStorage.setItem(
+        'idealFcmTokenAtualizadoEm',
+        new Date().toISOString()
+      );
+
+      localStorage.setItem(
+        'idealPushVersion',
+        IDEAL_PUSH_VERSION
+      );
+
+      atualizarBotaoPush();
+
+      cadastrarTokenComTentativas(
+        token
+      );
+
+      if(mostrarSucesso){
+        mostrarMensagemPush(
+          '✅ Notificações ativadas com sucesso.'
+        );
+      }
+
+      return token;
     }
 
     async function iniciarPush(){
+      btnPush.disabled = true;
+      btnPush.textContent =
+        'Ativando...';
+
       try{
-        if(!('Notification' in window)){
-          mostrarMensagemPush(
-            'Este navegador não oferece suporte a notificações.'
-          );
-          return;
-        }
-
-        if(!('serviceWorker' in navigator)){
-          mostrarMensagemPush(
-            'Este navegador não oferece suporte ao recurso necessário para notificações.'
-          );
-          return;
-        }
-
-        const suportado = await isSupported();
-
-        if(!suportado){
-          mostrarMensagemPush(
-            'Notificações Firebase não são compatíveis com este navegador.'
-          );
-          return;
-        }
-
-        const permissao = await Notification.requestPermission();
-
-        if(permissao !== 'granted'){
-          atualizarBotaoPush();
-          mostrarMensagemPush(
-            permissao === 'denied'
-              ? 'As notificações foram bloqueadas. Você pode liberá-las nas permissões do navegador.'
-              : 'A permissão para notificações não foi concedida.'
-          );
-          return;
-        }
-
-        btnPush.disabled = true;
-        btnPush.textContent = 'Ativando...';
-
-        /*
-         * MASTER 9.7.2.4 — SERVICE WORKER ÚNICO
-         *
-         * O mesmo service-worker.js que controla o PWA também passa
-         * a receber as mensagens do Firebase. Isso evita a separação
-         * entre o PWA instalado e o Worker usado para Push.
-         */
-
-        /* Remove somente o Worker secundário das versões anteriores. */
-        const registrations =
-          await navigator.serviceWorker.getRegistrations();
-
-        for(const reg of registrations){
-          if(
-            reg.scope &&
-            reg.scope.includes(
-              '/firebase-cloud-messaging-push-scope/'
-            )
-          ){
-            await reg.unregister();
-          }
-        }
-
-        /*
-         * Registra/atualiza o Service Worker principal do PWA.
-         */
-        const appRegistration =
-          await navigator.serviceWorker.register(
-            './service-worker.js?v=981',
-            {
-              scope: './',
-              updateViaCache: 'none'
-            }
-          );
-
-        try{
-          await appRegistration.update();
-        }catch(updateErr){
-          console.warn(
-            'IDEAL Push — atualização do Service Worker:',
-            updateErr
-          );
-        }
-
-        /*
-         * navigator.serviceWorker.ready devolve o Worker ativo que
-         * efetivamente controla o PWA instalado.
-         */
-        const appSwRegistration =
-          appRegistration.active
-            ? appRegistration
-            : await navigator.serviceWorker.ready;
-
-        /*
-         * MASTER 9.7.2.9 — API ATUAL DO FIREBASE
-         *
-         * O Firebase recomenda register() + onRegistered().
-         * O identificador retornado agora é o Firebase Installation ID (FID).
-         * O mesmo Service Worker principal do PWA é informado explicitamente.
-         */
-        let fidRecebido = '';
-
-        const aguardarFid = new Promise((resolve, reject) => {
-          let finalizado = false;
-
-          const cancelar = onRegistered(messaging, (installationId) => {
-            if(finalizado){
-              return;
-            }
-
-            finalizado = true;
-            fidRecebido = installationId || '';
-
-            try{
-              cancelar();
-            }catch(_){}
-
-            resolve(fidRecebido);
-          });
-
-          setTimeout(() => {
-            if(finalizado){
-              return;
-            }
-
-            finalizado = true;
-
-            try{
-              cancelar();
-            }catch(_){}
-
-            reject(
-              new Error(
-                'O Firebase não retornou o ID de instalação dentro do tempo esperado.'
-              )
-            );
-          }, 15000);
+        await obterTokenFcm({
+          pedirPermissao: true,
+          mostrarSucesso: true
         });
-
-        await register(messaging, {
-          vapidKey: VAPID_PUBLIC_KEY,
-          serviceWorkerRegistration: appSwRegistration
-        });
-
-        const currentFid = await aguardarFid;
-
-        if(!currentFid){
-          throw new Error(
-            'O Firebase não retornou um ID de instalação para este aparelho.'
-          );
-        }
-
-        localStorage.setItem('idealFcmFid', currentFid);
-        localStorage.setItem(
-          'idealFcmFidAtualizadoEm',
-          new Date().toISOString()
-        );
-
-        atualizarBotaoPush();
-
-        mostrarMensagemPush(
-          '✅ Notificações registradas. Novo ID Firebase gerado com sucesso.'
-        );
 
       }catch(err){
-        console.error('IDEAL Push — erro ao ativar:', err);
+        console.error(
+          '[IDEAL Push 9.7.3] Erro:',
+          err
+        );
 
         const detalhe =
-          (err && (err.code || err.message))
-            ? String(err.code || err.message)
+          err &&
+          (err.code || err.message)
+            ? String(
+                err.code ||
+                err.message
+              )
             : 'erro desconhecido';
 
         mostrarMensagemPush(
-          'Não foi possível ativar as notificações. Detalhe: ' + detalhe,
+          'Não foi possível ativar as notificações. Detalhe: ' +
+          detalhe,
           12000
         );
 
@@ -578,63 +737,139 @@
       }
     }
 
-    const app = initializeApp(firebaseConfig);
-    const messaging = getMessaging(app);
+    btnPush.addEventListener(
+      'click',
+      async () => {
+        if(
+          Notification.permission ===
+          'granted'
+        ){
+          try{
+            const token =
+              await obterTokenFcm({
+                pedirPermissao: false,
+                mostrarSucesso: false
+              });
 
+            if(token){
+              mostrarMensagemPush(
+                '✅ Notificações já estão ativas.'
+              );
+            }
+          }catch(err){
+            console.error(
+              '[IDEAL Push] Falha ao atualizar token:',
+              err
+            );
 
-    /*
-     * Quando o app estiver aberto, o Firebase entrega a mensagem para
-     * onMessage(). Mostramos um aviso dentro do próprio PWA.
-     */
+            mostrarMensagemPush(
+              'Não foi possível atualizar o cadastro das notificações.',
+              9000
+            );
+          }
 
-    /*
-     * MASTER 9.7.2.8 — RECEBIMENTO NATIVO DO SERVICE WORKER
-     * O Service Worker encaminha a mensagem para a página quando o app
-     * estiver visível. Isso elimina a dependência do handler de background
-     * do SDK do Firebase dentro do Service Worker.
-     */
-    if('serviceWorker' in navigator){
-      navigator.serviceWorker.addEventListener('message', event => {
-        const mensagem = event.data || {};
-
-        if(mensagem.type !== 'IDEAL_PUSH'){
           return;
         }
 
+        await iniciarPush();
+      }
+    );
+
+    /*
+     * Se o iframe do Apps Script carregar depois do token,
+     * tentamos novamente o cadastro.
+     */
+    appFramePush.addEventListener(
+      'load',
+      () => {
+        const token =
+          localStorage.getItem(
+            'idealFcmToken'
+          ) || '';
+
+        if(token){
+          window.setTimeout(
+            () => {
+              cadastrarTokenComTentativas(
+                token
+              );
+            },
+            700
+          );
+        }
+      }
+    );
+
+    /*
+     * Mensagem recebida com o PWA aberto.
+     */
+    onMessage(
+      messaging,
+      payload => {
         console.log(
-          'IDEAL Push — mensagem nativa recebida:',
-          mensagem.payload
+          '[IDEAL Push] Mensagem em primeiro plano:',
+          payload
         );
 
-        mostrarToastPush(mensagem.payload || {});
-      });
+        mostrarToastPush(
+          payload
+        );
+      }
+    );
+
+    /*
+     * Também aceita mensagens encaminhadas pelo Service Worker.
+     */
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.addEventListener(
+        'message',
+        event => {
+          const mensagem =
+            event.data || {};
+
+          if(
+            mensagem.type !==
+            'IDEAL_PUSH'
+          ){
+            return;
+          }
+
+          mostrarToastPush(
+            mensagem.payload || {}
+          );
+        }
+      );
     }
 
-    onMessage(messaging, (payload) => {
-      console.log(
-        'IDEAL Push — mensagem em primeiro plano:',
-        payload
-      );
-
-      mostrarToastPush(payload);
-    });
-
-    btnPush.addEventListener('click', async () => {
-      const fid = localStorage.getItem('idealFcmFid') || '';
-
-      if(
-        'Notification' in window &&
-        Notification.permission === 'granted' &&
-        fid
-      ){
-        await copiarTokenPush();
-        return;
-      }
-
-      await iniciarPush();
-    });
-
     atualizarBotaoPush();
+
+    /*
+     * Cadastro automático:
+     * se o cliente já autorizou notificações, o PWA obtém/renova
+     * o token FCM ao abrir e envia para a planilha sem pedir nada.
+     */
+    if(
+      'Notification' in window &&
+      Notification.permission ===
+      'granted'
+    ){
+      window.setTimeout(
+        async () => {
+          try{
+            await obterTokenFcm({
+              pedirPermissao: false,
+              mostrarSucesso: false
+            });
+          }catch(err){
+            console.warn(
+              '[IDEAL Push 9.7.3] Cadastro automático pendente:',
+              err
+            );
+          }
+        },
+        1200
+      );
+    }
   </script>
 
 </body>
