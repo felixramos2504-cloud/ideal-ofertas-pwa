@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Token FCM de Teste — IDEAL</title>
+  <style>
+    body{
+      margin:0;
+      padding:18px;
+      font-family:Arial,sans-serif;
+      background:#f4f4f4;
+      color:#222;
+    }
+    .box{
+      max-width:820px;
+      margin:auto;
+      padding:20px;
+      border-radius:16px;
+      background:#fff;
+      box-shadow:0 4px 16px rgba(0,0,0,.12);
+    }
+    h1{font-size:22px;margin-top:0}
+    button{
+      width:100%;
+      border:0;
+      border-radius:10px;
+      padding:14px 16px;
+      margin:6px 0 12px;
+      font-size:16px;
+      font-weight:700;
+      cursor:pointer;
+      background:#d71920;
+      color:#fff;
+    }
+    #copiar{
+      background:#222;
+      display:none;
+    }
+    pre{
+      white-space:pre-wrap;
+      word-break:break-word;
+      background:#111;
+      color:#fff;
+      padding:14px;
+      border-radius:10px;
+      min-height:180px;
+      line-height:1.45;
+      font-size:13px;
+    }
+  </style>
+</head>
+<body>
+<div class="box">
+  <h1>Token FCM de Teste — IDEAL</h1>
+  <p>
+    Esta página gera um FCM registration token usando o
+    Service Worker atual do IDEAL Ofertas.
+  </p>
+
+  <button id="gerar">Gerar token FCM</button>
+  <button id="copiar">Copiar token FCM</button>
+
+  <pre id="saida">Toque em “Gerar token FCM”.</pre>
+</div>
+
+<script type="module">
+  import { initializeApp }
+    from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
+
+  import {
+    getMessaging,
+    getToken,
+    isSupported
+  } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging.js';
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCxNq9yO7JhXn9PHqgAMdls5Cb89yq2tv0",
+    authDomain: "ideal-ofertas.firebaseapp.com",
+    projectId: "ideal-ofertas",
+    storageBucket: "ideal-ofertas.firebasestorage.app",
+    messagingSenderId: "554998916130",
+    appId: "1:554998916130:web:ce65e917617d036f89167b"
+  };
+
+  const VAPID_PUBLIC_KEY =
+    "BFqbS_rj0lihvZnpl3n6RBf58k1U5S8i96ziLKok2d19uuV8oo1hv6utVLz2KIUaJYKkdaYpHzuw0T1dVK4_2Mw";
+
+  const saida = document.getElementById('saida');
+  const btnGerar = document.getElementById('gerar');
+  const btnCopiar = document.getElementById('copiar');
+
+  let tokenAtual = '';
+
+  async function gerar(){
+    btnGerar.disabled = true;
+    btnCopiar.style.display = 'none';
+    saida.textContent = 'Verificando...';
+
+    try{
+      if(!('serviceWorker' in navigator)){
+        throw new Error('Service Worker não é suportado.');
+      }
+
+      if(!('Notification' in window)){
+        throw new Error('Notification API não é suportada.');
+      }
+
+      if(Notification.permission !== 'granted'){
+        const permissao = await Notification.requestPermission();
+
+        if(permissao !== 'granted'){
+          throw new Error(
+            'Permissão de notificações não concedida.'
+          );
+        }
+      }
+
+      const suportado = await isSupported();
+
+      if(!suportado){
+        throw new Error(
+          'Firebase Messaging não é suportado neste navegador.'
+        );
+      }
+
+      const registration =
+        await navigator.serviceWorker.getRegistration(
+          './'
+        );
+
+      if(!registration){
+        throw new Error(
+          'Service Worker do IDEAL Ofertas não encontrado.'
+        );
+      }
+
+      if(!registration.active){
+        throw new Error(
+          'Service Worker encontrado, mas ainda não está ativo.'
+        );
+      }
+
+      const app = initializeApp(firebaseConfig);
+      const messaging = getMessaging(app);
+
+      tokenAtual = await getToken(messaging, {
+        vapidKey: VAPID_PUBLIC_KEY,
+        serviceWorkerRegistration: registration
+      });
+
+      if(!tokenAtual){
+        throw new Error(
+          'O Firebase não retornou um registration token.'
+        );
+      }
+
+      const sub =
+        await registration.pushManager.getSubscription();
+
+      saida.textContent =
+        'TOKEN FCM GERADO COM SUCESSO\n\n' +
+        'Service Worker:\n' +
+        registration.active.scriptURL +
+        '\n\nPushSubscription: ' +
+        (sub ? 'SIM' : 'NÃO') +
+        '\n\nFCM registration token:\n\n' +
+        tokenAtual;
+
+      btnCopiar.style.display = 'block';
+
+    }catch(err){
+      saida.textContent =
+        'ERRO:\n' +
+        String(
+          err &&
+          (err.stack || err.message) ||
+          err
+        );
+    }finally{
+      btnGerar.disabled = false;
+    }
+  }
+
+  async function copiar(){
+    if(!tokenAtual){
+      return;
+    }
+
+    try{
+      await navigator.clipboard.writeText(tokenAtual);
+      btnCopiar.textContent = '✅ Token copiado';
+    }catch(err){
+      saida.textContent +=
+        '\n\nNão foi possível copiar automaticamente. ' +
+        'Selecione o token acima e copie manualmente.';
+    }
+  }
+
+  btnGerar.addEventListener('click', gerar);
+  btnCopiar.addEventListener('click', copiar);
+</script>
+</body>
+</html>
