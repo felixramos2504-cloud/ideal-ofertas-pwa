@@ -132,9 +132,161 @@
     }
 
     @media(display-mode:standalone){#installBar,#iosHelp{display:none!important}}
-  </style>
+  
+/* ==========================================================
+   MASTER 9.7.7.6 — SPLASH ANIMADA IDEAL
+   ========================================================== */
+#idealSplashAnimado{
+  position:fixed;
+  inset:0;
+  z-index:99999;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:linear-gradient(180deg,#ffffff 0%,#fff7e6 100%);
+  overflow:hidden;
+  opacity:1;
+  visibility:visible;
+  transition:opacity .45s ease, visibility .45s ease;
+}
+#idealSplashAnimado.oculto{
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+}
+.ideal-splash-wrap{
+  width:min(92vw,420px);
+  text-align:center;
+  position:relative;
+}
+.ideal-splash-trilho{
+  position:relative;
+  width:100%;
+  height:82px;
+  margin:0 auto 18px;
+  overflow:hidden;
+}
+.ideal-splash-trilho::after{
+  content:"";
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:14px;
+  height:4px;
+  border-radius:999px;
+  background:linear-gradient(90deg,#f0f0f0 0%,#d9d9d9 50%,#f0f0f0 100%);
+}
+.ideal-carrinho{
+  position:absolute;
+  left:-110px;
+  bottom:2px;
+  width:96px;
+  height:64px;
+  animation:idealCarrinhoEntrando 1.35s cubic-bezier(.22,.61,.36,1) .1s forwards;
+  filter:drop-shadow(0 10px 14px rgba(0,0,0,.16));
+}
+.ideal-carrinho svg{
+  width:100%;
+  height:100%;
+  display:block;
+}
+.ideal-roda{
+  animation:idealRodaGiro .35s linear infinite;
+  transform-origin:center;
+}
+.ideal-logo-texto{
+  opacity:0;
+  transform:translateY(14px) scale(.98);
+  animation:idealTextoSubindo .55s ease .95s forwards;
+}
+.ideal-marca{
+  font-size:clamp(28px,6vw,38px);
+  line-height:1.05;
+  font-weight:900;
+  color:#d71920;
+  letter-spacing:.2px;
+  margin:0;
+}
+.ideal-submarca{
+  margin-top:8px;
+  font-size:clamp(16px,3.8vw,22px);
+  font-weight:800;
+  color:#1f4e79;
+  letter-spacing:.4px;
+}
+.ideal-pontos{
+  display:inline-flex;
+  gap:6px;
+  margin-top:14px;
+}
+.ideal-pontos span{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#d71920;
+  opacity:.25;
+  animation:idealPulso 1s infinite;
+}
+.ideal-pontos span:nth-child(2){animation-delay:.15s}
+.ideal-pontos span:nth-child(3){animation-delay:.3s}
+
+@keyframes idealCarrinhoEntrando{
+  0%{transform:translateX(0)}
+  72%{transform:translateX(calc(50vw - 110px))}
+  100%{transform:translateX(calc(50vw - 145px))}
+}
+@media (min-width:480px){
+  @keyframes idealCarrinhoEntrando{
+    0%{transform:translateX(0)}
+    72%{transform:translateX(245px)}
+    100%{transform:translateX(210px)}
+  }
+}
+@keyframes idealTextoSubindo{
+  from{opacity:0;transform:translateY(14px) scale(.98)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes idealRodaGiro{
+  from{transform:rotate(0)}
+  to{transform:rotate(360deg)}
+}
+@keyframes idealPulso{
+  0%,100%{opacity:.25;transform:scale(.9)}
+  50%{opacity:1;transform:scale(1.15)}
+}
+
+</style>
 </head>
 <body>
+
+  <!-- ==========================================================
+       MASTER 9.7.7.6 — SPLASH ANIMADA IDEAL
+       ========================================================== -->
+  <div id="idealSplashAnimado" aria-hidden="true">
+    <div class="ideal-splash-wrap">
+      <div class="ideal-splash-trilho">
+        <div class="ideal-carrinho" aria-hidden="true">
+          <svg viewBox="0 0 160 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Carrinho do supermercado">
+            <path d="M18 18h18l10 44h67l15-31H51" fill="none" stroke="#1f4e79" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle class="ideal-roda" cx="63" cy="79" r="10" fill="#d71920"/>
+            <circle class="ideal-roda" cx="113" cy="79" r="10" fill="#d71920"/>
+            <rect x="64" y="30" width="12" height="20" rx="3" fill="#ffd54f"/>
+            <rect x="80" y="24" width="12" height="26" rx="3" fill="#4caf50"/>
+            <rect x="96" y="28" width="12" height="22" rx="3" fill="#ff7043"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="ideal-logo-texto">
+        <h1 class="ideal-marca">IDEAL Supermercados</h1>
+        <div class="ideal-submarca">Ofertas e Pedidos</div>
+        <div class="ideal-pontos" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
 
   <div id="loading">
     <img src="./icon-192.png" alt="IDEAL Supermercados">
@@ -988,6 +1140,43 @@
       );
     }
   </script>
+
+
+<script>
+/* ==========================================================
+   MASTER 9.7.7.6 — CONTROLE DA SPLASH ANIMADA
+   ========================================================== */
+(function(){
+  const splash =
+    document.getElementById(
+      'idealSplashAnimado'
+    );
+
+  if(!splash){
+    return;
+  }
+
+  function fecharSplashIdeal(){
+    splash.classList.add('oculto');
+    window.setTimeout(function(){
+      splash.style.display = 'none';
+    }, 520);
+  }
+
+  window.addEventListener(
+    'load',
+    function(){
+      window.setTimeout(
+        fecharSplashIdeal,
+        2800
+      );
+    }
+  );
+
+  window.fecharSplashIdeal =
+    fecharSplashIdeal;
+})();
+</script>
 
 </body>
 </html>
