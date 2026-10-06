@@ -1,9 +1,9 @@
 /* =========================================================
-   IDEAL SUPERMERCADOS — MASTER 9.7.6.1 — CORREÇÃO NOTIFICAÇÃO DUPLICADA
+   IDEAL SUPERMERCADOS — MASTER 9.7.8.0 — SEM ABA VISÍVEL DE NOTIFICAÇÕES
    FIREBASE MESSAGING + PWA — FID
    ========================================================= */
 
-const CACHE_NAME = 'ideal-ofertas-pwa-shell-v9-push-unico';
+const CACHE_NAME = 'ideal-ofertas-pwa-shell-v11-sem-loading-intermediario';
 
 const STATIC_FILES = [
   './',
