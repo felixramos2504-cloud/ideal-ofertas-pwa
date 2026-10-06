@@ -272,7 +272,7 @@
     const VAPID_PUBLIC_KEY =
       "BFqbS_rj0lihvZnpl3n6RBf58k1U5S8i96ziLKok2d19uuV8oo1hv6utVLz2KIUaJYKkdaYpHzuw0T1dVK4_2Mw";
 
-    const IDEAL_PUSH_VERSION = '9.7.3.1';
+    const IDEAL_PUSH_VERSION = '9.7.7.2';
     const IDEAL_SW_URL = './service-worker.js?v=981';
 
     const btnPush =
@@ -303,7 +303,7 @@
     let tokenConfirmadoBackend = '';
 
     /*
-     * MASTER 9.7.3.1
+     * MASTER 9.7.7.2
      * A janela real do HTML Service do Apps Script é descoberta
      * por handshake, evitando problemas com iframes intermediários.
      */
@@ -465,6 +465,54 @@
           : '🔔 Ativar notificações';
     }
 
+    function obterUltimoPedidoPush(){
+      try{
+        const bruto =
+          localStorage.getItem(
+            'ideal_fm4_ultimo_pedido_v1'
+          );
+
+        if(!bruto){
+          return {
+            telefone: '',
+            idPedido: ''
+          };
+        }
+
+        const pedido =
+          JSON.parse(bruto) || {};
+
+        return {
+          telefone:
+            String(
+              pedido.telefone ||
+              (
+                pedido.cliente &&
+                pedido.cliente.telefone
+              ) ||
+              ''
+            )
+            .replace(/\D/g, ''),
+
+          idPedido:
+            String(
+              pedido.idPedido || ''
+            ).trim()
+        };
+
+      }catch(err){
+        console.warn(
+          '[IDEAL Push 9.7.7.2] Não foi possível ler o último pedido local:',
+          err
+        );
+
+        return {
+          telefone: '',
+          idPedido: ''
+        };
+      }
+    }
+
     function enviarTokenAoAppsScript(token){
       if(
         !token ||
@@ -494,7 +542,15 @@
               navigator.userAgent || '',
 
             origem:
-              'IDEAL_OFERTAS_PWA_GITHUB'
+              'IDEAL_OFERTAS_PWA_GITHUB',
+
+            telefone:
+              obterUltimoPedidoPush()
+                .telefone,
+
+            idPedido:
+              obterUltimoPedidoPush()
+                .idPedido
           }
         },
         ponteAppsScriptOrigin
@@ -503,7 +559,7 @@
       ultimoTokenEnviado = token;
 
       console.log(
-        '[IDEAL Push 9.7.3.1] Token enviado para a ponte Apps Script.'
+        '[IDEAL Push 9.7.7.2] Token enviado para a ponte Apps Script.'
       );
 
       return true;
@@ -567,7 +623,7 @@
             true;
 
           console.log(
-            '[IDEAL Push 9.7.3.1] Ponte Apps Script pronta:',
+            '[IDEAL Push 9.7.7.2] Ponte Apps Script pronta:',
             event.origin
           );
 
@@ -617,7 +673,7 @@
           );
 
           console.log(
-            '[IDEAL Push 9.7.3.1] Token confirmado na planilha:',
+            '[IDEAL Push 9.7.7.2] Token confirmado na planilha:',
             mensagem.resultado
           );
 
@@ -630,7 +686,7 @@
         }
 
         console.warn(
-          '[IDEAL Push 9.7.3.1] Apps Script não salvou o token:',
+          '[IDEAL Push 9.7.7.2] Apps Script não salvou o token:',
           mensagem.erro ||
           'erro desconhecido'
         );
@@ -856,7 +912,7 @@
         ponteAppsScriptPronta = false;
 
         console.log(
-          '[IDEAL Push 9.7.3.1] Iframe carregado; aguardando handshake.'
+          '[IDEAL Push 9.7.7.2] Iframe carregado; aguardando handshake.'
         );
       }
     );
