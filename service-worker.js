@@ -1,9 +1,9 @@
 /* =========================================================
-   IDEAL SUPERMERCADOS — MASTER 9.7.2.10 — DIAGNÓSTICO
+   IDEAL SUPERMERCADOS — MASTER 9.7.6.1 — CORREÇÃO NOTIFICAÇÃO DUPLICADA
    FIREBASE MESSAGING + PWA — FID
    ========================================================= */
 
-const CACHE_NAME = 'ideal-ofertas-pwa-shell-v8-diag';
+const CACHE_NAME = 'ideal-ofertas-pwa-shell-v9-push-unico';
 
 const STATIC_FILES = [
   './',
@@ -184,47 +184,72 @@ messaging.onBackgroundMessage(payload => {
     payload
   );
 
-  const notification =
-    (payload && payload.notification) || {};
-
-  const data =
-    (payload && payload.data) || {};
-
-  const fcmOptions =
-    (payload && payload.fcmOptions) || {};
-
-  const title =
-    notification.title ||
-    data.title ||
-    'IDEAL Supermercados';
-
-  const options = {
-    body:
-      notification.body ||
-      data.body ||
-      'Você recebeu uma nova atualização.',
-    icon:
-      notification.icon ||
-      data.icon ||
-      './icon-192.png',
-    badge: './icon-192.png',
-    tag:
-      data.tag ||
-      'ideal-ofertas',
-    renotify: true,
-    data: {
-      url:
-        fcmOptions.link ||
-        data.url ||
-        './'
-    }
-  };
-
   return (async () => {
     await logDiag(
       'FCM_BACKGROUND_RECEBIDO',
       resumo
     );
+
+    /*
+     * MASTER 9.7.6.1 — CORREÇÃO DE DUPLICIDADE
+     *
+     * Quando a mensagem possui "notification", o próprio Firebase
+     * Messaging exibe a notificação do sistema automaticamente.
+     *
+     * A versão anterior chamava showNotification() novamente,
+     * causando duas notificações iguais.
+     */
+    if(
+      payload &&
+      payload.notification
+    ){
+      await logDiag(
+        'FCM_AUTO_NOTIFICATION',
+        {
+          title:
+            payload.notification.title || '',
+          body:
+            payload.notification.body || ''
+        }
+      );
+
+      return;
+    }
+
+    /*
+     * Mensagens DATA-ONLY não são exibidas automaticamente.
+     * Para elas mantemos showNotification() manual.
+     */
+    const data =
+      (payload && payload.data) || {};
+
+    const fcmOptions =
+      (payload && payload.fcmOptions) || {};
+
+    const title =
+      data.title ||
+      'IDEAL Supermercados';
+
+    const options = {
+      body:
+        data.body ||
+        'Você recebeu uma nova atualização.',
+      icon:
+        data.icon ||
+        './icon-192.png',
+      badge:
+        './icon-192.png',
+      tag:
+        data.tag ||
+        'ideal-ofertas',
+      renotify: true,
+      data: {
+        url:
+          fcmOptions.link ||
+          data.url ||
+          './'
+      }
+    };
 
     try{
       await self.registration.showNotification(
