@@ -339,9 +339,18 @@ body.idealSplashAberta #iosHelp{
 }
 
 
-/* MASTER 9.7.7.9 — OCULTA ABA/BOTÃO DE NOTIFICAÇÕES, MANTÉM PUSH ATIVO */
+/* MASTER 9.7.7.9 — SEM ABA VISÍVEL DE NOTIFICAÇÕES */
 #pushBox {
   display: none !important;
+}
+
+
+/* MASTER 9.7.8.0 — REMOVE TELA INTERMEDIÁRIA CARREGANDO OFERTAS */
+#loading {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 </style>
@@ -430,7 +439,7 @@ body.idealSplashAberta #iosHelp{
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js?v=981', { scope: './', updateViaCache: 'none' })
+        navigator.serviceWorker.register('./service-worker.js?v=983', { scope: './', updateViaCache: 'none' })
           .then(reg => console.log('IDEAL PWA ativo:', reg.scope))
           .catch(err => console.error('Erro Service Worker:', err));
       });
@@ -514,7 +523,7 @@ body.idealSplashAberta #iosHelp{
       "BFqbS_rj0lihvZnpl3n6RBf58k1U5S8i96ziLKok2d19uuV8oo1hv6utVLz2KIUaJYKkdaYpHzuw0T1dVK4_2Mw";
 
     const IDEAL_PUSH_VERSION = '9.7.7.2';
-    const IDEAL_SW_URL = './service-worker.js?v=981';
+    const IDEAL_SW_URL = './service-worker.js?v=983';
 
     const btnPush =
       document.getElementById('btnPush');
