@@ -353,6 +353,95 @@ body.idealSplashAberta #iosHelp{
   pointer-events: none !important;
 }
 
+
+/* MASTER 10.0.2 — CONVITE DISCRETO PARA NOTIFICAÇÕES */
+#pushConsent1002{
+  display:none;
+  position:fixed;
+  left:12px;
+  right:12px;
+  bottom:calc(14px + env(safe-area-inset-bottom));
+  z-index:200020;
+  max-width:460px;
+  margin:0 auto;
+  background:#fff;
+  color:#222;
+  border:1px solid #ececec;
+  border-radius:16px;
+  box-shadow:0 12px 34px rgba(0,0,0,.24);
+  padding:14px;
+}
+#pushConsent1002.visivel{
+  display:block;
+  animation:idealPushConsentEntrada .24s ease-out;
+}
+#pushConsent1002 .pc1002-topo{
+  display:flex;
+  gap:10px;
+  align-items:flex-start;
+}
+#pushConsent1002 .pc1002-icone{
+  width:38px;
+  height:38px;
+  flex:0 0 38px;
+  border-radius:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#fff1f1;
+  font-size:20px;
+}
+#pushConsent1002 strong{
+  display:block;
+  color:#d71920;
+  font-size:14px;
+  line-height:1.25;
+  margin-bottom:3px;
+}
+#pushConsent1002 p{
+  margin:0;
+  color:#555;
+  font-size:11px;
+  line-height:1.4;
+}
+#pushConsent1002 .pc1002-acoes{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:12px;
+}
+#pushConsent1002 button{
+  border:0;
+  min-height:42px;
+  border-radius:11px;
+  font-weight:800;
+  font-size:12px;
+  cursor:pointer;
+}
+#btnPushConsentAtivar{
+  background:#d71920;
+  color:#fff;
+}
+#btnPushConsentDepois{
+  background:#f2f2f2;
+  color:#444;
+}
+#pushConsent1002 button:disabled{
+  opacity:.65;
+  cursor:wait;
+}
+@keyframes idealPushConsentEntrada{
+  from{opacity:0;transform:translateY(16px)}
+  to{opacity:1;transform:translateY(0)}
+}
+@media(max-width:520px){
+  #pushConsent1002{
+    left:9px;
+    right:9px;
+    bottom:calc(9px + env(safe-area-inset-bottom));
+  }
+}
+
 </style>
 </head>
 <body class="idealSplashAberta">
@@ -411,6 +500,22 @@ body.idealSplashAberta #iosHelp{
     <span id="pushToastBody"></span>
   </div>
 
+
+  <!-- MASTER 10.0.2 — CONVITE DISCRETO PARA PUSH -->
+  <div id="pushConsent1002" role="dialog" aria-live="polite" aria-label="Ativar avisos do IDEAL">
+    <div class="pc1002-topo">
+      <div class="pc1002-icone" aria-hidden="true">🔔</div>
+      <div>
+        <strong>Receba avisos do seu pedido</strong>
+        <p>Ative as notificações para acompanhar separação, saída para entrega e conclusão do pedido.</p>
+      </div>
+    </div>
+    <div class="pc1002-acoes">
+      <button id="btnPushConsentDepois" type="button">Agora não</button>
+      <button id="btnPushConsentAtivar" type="button">Ativar avisos</button>
+    </div>
+  </div>
+
   <div id="installBar">
     <div id="installText">
       <strong>📲 Instale o IDEAL Ofertas & Pedidos</strong>
@@ -439,7 +544,7 @@ body.idealSplashAberta #iosHelp{
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js?v=983', { scope: './', updateViaCache: 'none' })
+        navigator.serviceWorker.register('./service-worker.js?v=984', { scope: './', updateViaCache: 'none' })
           .then(reg => console.log('IDEAL PWA ativo:', reg.scope))
           .catch(err => console.error('Erro Service Worker:', err));
       });
@@ -522,8 +627,8 @@ body.idealSplashAberta #iosHelp{
     const VAPID_PUBLIC_KEY =
       "BFqbS_rj0lihvZnpl3n6RBf58k1U5S8i96ziLKok2d19uuV8oo1hv6utVLz2KIUaJYKkdaYpHzuw0T1dVK4_2Mw";
 
-    const IDEAL_PUSH_VERSION = '9.7.7.2';
-    const IDEAL_SW_URL = './service-worker.js?v=983';
+    const IDEAL_PUSH_VERSION = '10.0.2';
+    const IDEAL_SW_URL = './service-worker.js?v=984';
 
     const btnPush =
       document.getElementById('btnPush');
@@ -986,7 +1091,146 @@ body.idealSplashAberta #iosHelp{
       }
 
       if(permissao !== 'granted'){
-        atualizarBotaoPush();
+    
+    /* MASTER 10.0.2 — CONTROLE DO CONVITE DE NOTIFICAÇÕES */
+    const pushConsent1002 =
+      document.getElementById('pushConsent1002');
+
+    const btnPushConsentAtivar =
+      document.getElementById('btnPushConsentAtivar');
+
+    const btnPushConsentDepois =
+      document.getElementById('btnPushConsentDepois');
+
+    const PUSH_CONSENT_ADIADO_ATE =
+      'idealPushConsent1002AdiadoAte';
+
+    function ocultarPushConsent1002(){
+      if(pushConsent1002){
+        pushConsent1002.classList.remove('visivel');
+      }
+    }
+
+    function podeMostrarPushConsent1002(){
+      if(!pushConsent1002){
+        return false;
+      }
+
+      if(
+        !('Notification' in window) ||
+        !('serviceWorker' in navigator)
+      ){
+        return false;
+      }
+
+      if(Notification.permission !== 'default'){
+        return false;
+      }
+
+      const adiadoAte =
+        Number(
+          localStorage.getItem(
+            PUSH_CONSENT_ADIADO_ATE
+          ) || 0
+        );
+
+      return !adiadoAte || Date.now() >= adiadoAte;
+    }
+
+    function mostrarPushConsent1002(){
+      if(podeMostrarPushConsent1002()){
+        pushConsent1002.classList.add('visivel');
+      }
+    }
+
+    if(btnPushConsentDepois){
+      btnPushConsentDepois.addEventListener(
+        'click',
+        () => {
+          const trintaDias =
+            30 * 24 * 60 * 60 * 1000;
+
+          localStorage.setItem(
+            PUSH_CONSENT_ADIADO_ATE,
+            String(Date.now() + trintaDias)
+          );
+
+          ocultarPushConsent1002();
+        }
+      );
+    }
+
+    if(btnPushConsentAtivar){
+      btnPushConsentAtivar.addEventListener(
+        'click',
+        async () => {
+          btnPushConsentAtivar.disabled = true;
+          btnPushConsentDepois.disabled = true;
+          btnPushConsentAtivar.textContent = 'Ativando...';
+
+          try{
+            const token =
+              await obterTokenFcm({
+                pedirPermissao: true,
+                mostrarSucesso: false
+              });
+
+            if(token){
+              localStorage.removeItem(
+                PUSH_CONSENT_ADIADO_ATE
+              );
+
+              ocultarPushConsent1002();
+
+              mostrarToastPush({
+                data:{
+                  title:'Avisos ativados 🔔',
+                  body:'Você receberá atualizações importantes do seu pedido.'
+                }
+              });
+            }else if(
+              Notification.permission === 'denied'
+            ){
+              ocultarPushConsent1002();
+
+              mostrarToastPush({
+                data:{
+                  title:'Notificações não ativadas',
+                  body:'A permissão foi bloqueada no navegador.'
+                }
+              });
+            }
+          }catch(err){
+            console.warn(
+              '[IDEAL Push 10.0.2] Falha ao ativar:',
+              err
+            );
+
+            mostrarToastPush({
+              data:{
+                title:'Não foi possível ativar agora',
+                body:'Tente novamente quando estiver com conexão estável.'
+              }
+            });
+          }finally{
+            btnPushConsentAtivar.disabled = false;
+            btnPushConsentDepois.disabled = false;
+            btnPushConsentAtivar.textContent = 'Ativar avisos';
+          }
+        }
+      );
+    }
+
+    /*
+     * Mostra somente depois da Splash oficial.
+     * Em aparelhos que já autorizaram ou bloquearam, não aparece.
+     */
+    window.setTimeout(
+      mostrarPushConsent1002,
+      4100
+    );
+
+    atualizarBotaoPush();
 
         if(pedirPermissao){
           mostrarMensagemPush(
