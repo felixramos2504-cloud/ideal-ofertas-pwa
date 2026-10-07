@@ -544,7 +544,7 @@ body.idealSplashAberta #iosHelp{
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js?v=984', { scope: './', updateViaCache: 'none' })
+        navigator.serviceWorker.register('./service-worker.js?v=985', { scope: './', updateViaCache: 'none' })
           .then(reg => console.log('IDEAL PWA ativo:', reg.scope))
           .catch(err => console.error('Erro Service Worker:', err));
       });
@@ -627,8 +627,8 @@ body.idealSplashAberta #iosHelp{
     const VAPID_PUBLIC_KEY =
       "BFqbS_rj0lihvZnpl3n6RBf58k1U5S8i96ziLKok2d19uuV8oo1hv6utVLz2KIUaJYKkdaYpHzuw0T1dVK4_2Mw";
 
-    const IDEAL_PUSH_VERSION = '10.0.2';
-    const IDEAL_SW_URL = './service-worker.js?v=984';
+    const IDEAL_PUSH_VERSION = '10.0.3';
+    const IDEAL_SW_URL = './service-worker.js?v=985';
 
     const btnPush =
       document.getElementById('btnPush');
@@ -1486,12 +1486,23 @@ body.idealSplashAberta #iosHelp{
 
 <script>
 /* ==========================================================
-   MASTER 9.7.7.8 — CONTROLE DA SPLASH OFICIAL
+   MASTER 10.0.3 — ABERTURA INTELIGENTE DA SPLASH
+   Mantém integralmente o visual/animação aprovados.
+   Abertura:
+   1) completa a animação;
+   2) aguarda o sinal do app interno;
+   3) fallback pelo load do iframe;
+   4) limite máximo para nunca prender a abertura.
    ========================================================== */
 (function(){
   const splash =
     document.getElementById(
       'idealSplashAnimado'
+    );
+
+  const iframeApp =
+    document.getElementById(
+      'appFrame'
     );
 
   if(!splash){
@@ -1501,14 +1512,49 @@ body.idealSplashAberta #iosHelp{
     return;
   }
 
-  let fechada = false;
+  const inicio =
+    Date.now();
 
-  function fecharSplashIdeal(){
+  /*
+   * 3,5 s preserva a sequência visual oficial já aprovada.
+   * 8 s é apenas a trava de segurança para conexões muito lentas.
+   */
+  const TEMPO_MINIMO_SPLASH = 3500;
+  const TEMPO_MAXIMO_SPLASH = 8000;
+
+  let fechada = false;
+  let appPronto = false;
+  let iframeCarregado = false;
+  let timerMinimo = null;
+  let timerFallbackIframe = null;
+
+  function tempoDecorrido(){
+    return Date.now() - inicio;
+  }
+
+  function fecharSplashIdeal(motivo){
     if(fechada){
       return;
     }
 
     fechada = true;
+
+    if(timerMinimo){
+      window.clearTimeout(
+        timerMinimo
+      );
+    }
+
+    if(timerFallbackIframe){
+      window.clearTimeout(
+        timerFallbackIframe
+      );
+    }
+
+    console.log(
+      '[IDEAL 10.0.3] Splash liberada:',
+      motivo || 'pronto'
+    );
 
     splash.classList.add(
       'oculto'
@@ -1527,23 +1573,157 @@ body.idealSplashAberta #iosHelp{
     );
   }
 
+  function tentarLiberarSplash(
+    motivo
+  ){
+    if(fechada){
+      return;
+    }
+
+    const decorrido =
+      tempoDecorrido();
+
+    const faltam =
+      TEMPO_MINIMO_SPLASH -
+      decorrido;
+
+    /*
+     * Mesmo que o app esteja pronto muito rápido,
+     * a animação oficial termina antes de abrir.
+     */
+    if(faltam > 0){
+      if(timerMinimo){
+        window.clearTimeout(
+          timerMinimo
+        );
+      }
+
+      timerMinimo =
+        window.setTimeout(
+          function(){
+            tentarLiberarSplash(
+              motivo
+            );
+          },
+          faltam + 20
+        );
+
+      return;
+    }
+
+    if(appPronto){
+      fecharSplashIdeal(
+        motivo ||
+        'app interno pronto'
+      );
+      return;
+    }
+
+    /*
+     * Fallback: se o iframe terminou de carregar mas o
+     * handshake não chegou, damos uma pequena margem e abrimos.
+     */
+    if(iframeCarregado){
+      if(!timerFallbackIframe){
+        timerFallbackIframe =
+          window.setTimeout(
+            function(){
+              fecharSplashIdeal(
+                'fallback iframe carregado'
+              );
+            },
+            650
+          );
+      }
+    }
+  }
+
   /*
-   * Sequência:
-   * 1) carrinho original entra da direita para a esquerda;
-   * 2) para e encaixa na marca;
-   * 3) IDEAL Supermercados completa;
-   * 4) aparece "Ofertas e Pedidos";
-   * 5) abre o aplicativo.
+   * Sinal já existente no aplicativo interno.
+   * É enviado pela ponte do Apps Script.
    */
-  window.setTimeout(
-    fecharSplashIdeal,
-    3500
+  window.addEventListener(
+    'message',
+    function(event){
+      const mensagem =
+        event.data || {};
+
+      if(
+        mensagem.type !==
+        'IDEAL_PUSH_BRIDGE_READY'
+      ){
+        return;
+      }
+
+      const origem =
+        String(
+          event.origin || ''
+        );
+
+      if(
+        origem.indexOf(
+          'script.google.com'
+        ) === -1 &&
+        origem.indexOf(
+          'googleusercontent.com'
+        ) === -1
+      ){
+        return;
+      }
+
+      appPronto = true;
+
+      tentarLiberarSplash(
+        'sinal do app interno'
+      );
+    }
   );
 
-  /* Segurança para nunca prender a abertura. */
+  /*
+   * Segundo critério de segurança: término do carregamento
+   * do iframe. Não fecha imediatamente; respeita o tempo
+   * mínimo e a margem do fallback.
+   */
+  if(iframeApp){
+    iframeApp.addEventListener(
+      'load',
+      function(){
+        iframeCarregado = true;
+
+        tentarLiberarSplash(
+          'iframe carregado'
+        );
+      }
+    );
+  }
+
+  /*
+   * Se o app já sinalizou antes de completar a animação,
+   * esta chamada libera exatamente após o tempo mínimo.
+   */
+  timerMinimo =
+    window.setTimeout(
+      function(){
+        tentarLiberarSplash(
+          appPronto
+            ? 'app pronto após animação'
+            : 'aguardando app'
+        );
+      },
+      TEMPO_MINIMO_SPLASH
+    );
+
+  /*
+   * Trava final: nunca deixa o usuário preso na Splash,
+   * mesmo se o Apps Script ou a rede estiverem com problema.
+   */
   window.setTimeout(
-    fecharSplashIdeal,
-    4800
+    function(){
+      fecharSplashIdeal(
+        'limite máximo de segurança'
+      );
+    },
+    TEMPO_MAXIMO_SPLASH
   );
 
   window.fecharSplashIdeal =
