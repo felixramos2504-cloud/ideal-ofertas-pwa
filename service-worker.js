@@ -1,9 +1,9 @@
 /* =========================================================
-   IDEAL SUPERMERCADOS — MASTER 10.0.2 — SEM ABA VISÍVEL DE NOTIFICAÇÕES
+   IDEAL SUPERMERCADOS — MASTER 10.0.3 — SEM ABA VISÍVEL DE NOTIFICAÇÕES
    FIREBASE MESSAGING + PWA — FID
    ========================================================= */
 
-const CACHE_NAME = 'ideal-ofertas-pwa-shell-v12-push-consent-1002';
+const CACHE_NAME = 'ideal-ofertas-pwa-shell-v13-splash-inteligente-1003';
 
 const STATIC_FILES = [
   './',
