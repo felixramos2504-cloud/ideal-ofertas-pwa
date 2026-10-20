@@ -1,9 +1,9 @@
 /* =========================================================
-   IDEAL SUPERMERCADOS — MASTER 12 · FASE 16 — PUSH FID
+   IDEAL SUPERMERCADOS — MASTER 12 · FASE 16.1 — PUSH DIRETO EM SEGUNDO PLANO
    FIREBASE MESSAGING + PWA — FID
    ========================================================= */
 
-const CACHE_NAME = 'ideal-ofertas-pwa-shell-v12-fase16-fid';
+const CACHE_NAME = 'ideal-ofertas-pwa-shell-v12-fase16-1-background';
 
 const STATIC_FILES = [
   './',
@@ -75,22 +75,166 @@ async function logDiag(tipo, detalhe){
 }
 
 self.addEventListener('push', event => {
-  let resumo = 'evento push sem payload';
+  event.waitUntil((async () => {
+    let bruto = null;
+    let resumo = 'evento push sem payload';
 
-  try{
-    if(event.data){
-      resumo = event.data.text();
-      if(resumo.length > 2500){
-        resumo = resumo.slice(0, 2500) + '...';
+    try{
+      if(event.data){
+        try{
+          bruto = event.data.json();
+        }catch(_){
+          resumo = event.data.text();
+        }
+
+        if(bruto){
+          resumo = bruto;
+        }else if(
+          typeof resumo === 'string' &&
+          resumo.length > 2500
+        ){
+          resumo = resumo.slice(0, 2500) + '...';
+        }
       }
+    }catch(err){
+      resumo = 'erro ao ler payload: ' + String(err);
     }
-  }catch(err){
-    resumo = 'erro ao ler payload: ' + String(err);
-  }
 
-  event.waitUntil(
-    logDiag('PUSH_RAW_RECEBIDO', resumo)
-  );
+    await logDiag(
+      'PUSH_RAW_RECEBIDO',
+      resumo
+    );
+
+    /*
+     * FASE 16.1 — EXIBIÇÃO DIRETA PELO EVENTO PUSH
+     *
+     * O Push FID pode chegar ao Service Worker sem passar pelo
+     * onBackgroundMessage. Portanto a decisão de exibir a
+     * notificação é feita aqui, no evento nativo "push".
+     */
+    if(!bruto){
+      try{
+        if(event.data){
+          bruto = JSON.parse(event.data.text());
+        }
+      }catch(_){}
+    }
+
+    const notification =
+      (bruto && bruto.notification) || {};
+
+    const data =
+      (bruto && bruto.data) || {};
+
+    const title =
+      notification.title ||
+      data.title ||
+      'IDEAL Supermercados';
+
+    const body =
+      notification.body ||
+      data.body ||
+      'Você recebeu uma nova atualização.';
+
+    const icon =
+      notification.icon ||
+      data.icon ||
+      './icon-192.png';
+
+    const tag =
+      notification.tag ||
+      data.tag ||
+      (
+        bruto && bruto.fcmMessageId
+          ? 'ideal-' + bruto.fcmMessageId
+          : 'ideal-ofertas'
+      );
+
+    const url =
+      (
+        bruto &&
+        bruto.fcmOptions &&
+        bruto.fcmOptions.link
+      ) ||
+      data.url ||
+      './';
+
+    let clientes = [];
+
+    try{
+      clientes =
+        await self.clients.matchAll({
+          type: 'window',
+          includeUncontrolled: true
+        });
+    }catch(_){}
+
+    const appVisivel =
+      clientes.some(
+        client =>
+          client &&
+          client.visibilityState === 'visible'
+      );
+
+    /*
+     * Com o app aberto, o Firebase/onMessage já mostra o aviso
+     * dentro do aplicativo. Evitamos uma notificação duplicada.
+     */
+    if(appVisivel){
+      await logDiag(
+        'PUSH_APP_VISIVEL',
+        {
+          title: title,
+          body: body
+        }
+      );
+
+      return;
+    }
+
+    try{
+      await self.registration.showNotification(
+        title,
+        {
+          body: body,
+          icon: icon,
+          badge:
+            data.badge ||
+            './icon-192.png',
+          tag: tag,
+          renotify: true,
+          requireInteraction: false,
+          data: {
+            url: url
+          }
+        }
+      );
+
+      await logDiag(
+        'SHOW_NOTIFICATION_OK',
+        {
+          origem: 'PUSH_RAW_DIRETO',
+          title: title,
+          body: body
+        }
+      );
+    }catch(err){
+      await logDiag(
+        'SHOW_NOTIFICATION_ERRO',
+        {
+          origem: 'PUSH_RAW_DIRETO',
+          mensagem:
+            String(
+              err &&
+              (err.stack || err.message) ||
+              err
+            )
+        }
+      );
+
+      throw err;
+    }
+  })());
 });
 
 self.addEventListener('pushsubscriptionchange', event => {
@@ -180,112 +324,20 @@ messaging.onBackgroundMessage(payload => {
   };
 
   console.log(
-    '[IDEAL Push 12.15.4] Mensagem recebida em segundo plano:',
+    '[IDEAL Push 12.16.1] Mensagem Firebase em segundo plano:',
     payload
   );
 
-  return (async () => {
-    await logDiag(
-      'FCM_BACKGROUND_RECEBIDO',
-      resumo
-    );
-
-    /*
-     * MASTER 12 · ETAPA 15.4 — EXIBIÇÃO EXPLÍCITA
-     *
-     * Mesmo quando o payload contém "notification", exibimos a
-     * notificação explicitamente pelo Service Worker. Isso segue o
-     * padrão documentado do Firebase para onBackgroundMessage e evita
-     * depender da exibição automática do SDK/navegador.
-     */
-    const notification =
-      (payload && payload.notification) || {};
-
-    const data =
-      (payload && payload.data) || {};
-
-    const fcmOptions =
-      (payload && payload.fcmOptions) || {};
-
-    const title =
-      notification.title ||
-      data.title ||
-      'IDEAL Supermercados';
-
-    const options = {
-      body:
-        notification.body ||
-        data.body ||
-        'Você recebeu uma nova atualização.',
-      icon:
-        notification.icon ||
-        data.icon ||
-        './icon-192.png',
-      badge:
-        data.badge ||
-        './icon-192.png',
-      tag:
-        notification.tag ||
-        data.tag ||
-        'ideal-ofertas',
-      renotify: true,
-      requireInteraction: false,
-      data: {
-        url:
-          fcmOptions.link ||
-          data.url ||
-          './'
-      }
-    };
-
-    try{
-      await self.registration.showNotification(
-        title,
-        options
-      );
-
-      try{
-        const clientes = await self.clients.matchAll({
-          type: 'window',
-          includeUncontrolled: true
-        });
-        for(const client of clientes){
-          client.postMessage({
-            type: 'IDEAL_PUSH',
-            payload: {
-              notification: notification,
-              data: data
-            }
-          });
-        }
-      }catch(_){ }
-
-      await logDiag(
-        'SHOW_NOTIFICATION_OK',
-        {
-          title: title,
-          body: options.body,
-          possuiNotification: !!(payload && payload.notification)
-        }
-      );
-    }catch(err){
-      await logDiag(
-        'SHOW_NOTIFICATION_ERRO',
-        {
-          mensagem:
-            String(
-              err &&
-              (err.stack || err.message) ||
-              err
-            )
-        }
-      );
-
-      throw err;
-    }
-  })();
+  /*
+   * FASE 16.1
+   * O evento nativo "push" é o responsável exclusivo por
+   * showNotification(), evitando duplicidade.
+   */
+  return logDiag(
+    'FCM_BACKGROUND_RECEBIDO',
+    resumo
+  );
 });
-
 
 /* MASTER 12 · ETAPA 15.4 — teste local do canal de notificações. */
 self.addEventListener('message', event => {
