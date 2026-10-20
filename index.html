@@ -544,7 +544,7 @@ body.idealSplashAberta #iosHelp{
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js?v=985', { scope: './', updateViaCache: 'none' })
+        navigator.serviceWorker.register('./service-worker.js?v=121552', { scope: './', updateViaCache: 'none' })
           .then(reg => console.log('IDEAL PWA ativo:', reg.scope))
           .catch(err => console.error('Erro Service Worker:', err));
       });
@@ -628,7 +628,7 @@ body.idealSplashAberta #iosHelp{
       "BFqbS_rj0lihvZnpl3n6RBf58k1U5S8i96ziLKok2d19uuV8oo1hv6utVLz2KIUaJYKkdaYpHzuw0T1dVK4_2Mw";
 
     const IDEAL_PUSH_VERSION = '10.0.3';
-    const IDEAL_SW_URL = './service-worker.js?v=985';
+    const IDEAL_SW_URL = './service-worker.js?v=121552';
 
     const btnPush =
       document.getElementById('btnPush');
@@ -1728,6 +1728,89 @@ body.idealSplashAberta #iosHelp{
 
   window.fecharSplashIdeal =
     fecharSplashIdeal;
+})();
+</script>
+
+
+<!-- MASTER 12 · ETAPA 15.5.2 — DIAGNÓSTICO PUSH INDEPENDENTE -->
+<button id="idealDiagPushBtn" type="button"
+  style="position:fixed!important;right:14px!important;bottom:18px!important;z-index:2147483647!important;display:block!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;border:0!important;border-radius:999px!important;padding:12px 16px!important;background:#202124!important;color:#fff!important;box-shadow:0 8px 26px rgba(0,0,0,.32)!important;font:800 13px/1.1 Arial,sans-serif!important;cursor:pointer!important;">
+  🔎 Diagnóstico Push
+</button>
+<div id="idealDiagPushPanel"
+  style="display:none;position:fixed!important;right:14px!important;bottom:72px!important;z-index:2147483647!important;width:min(92vw,620px)!important;max-height:min(64vh,540px)!important;overflow:auto!important;background:#111!important;color:#e8eaed!important;border:1px solid #555!important;border-radius:12px!important;padding:14px!important;box-shadow:0 10px 36px rgba(0,0,0,.45)!important;text-align:left!important;font:12px/1.45 Consolas,Monaco,monospace!important;white-space:pre-wrap!important;word-break:break-word!important;pointer-events:auto!important;">
+</div>
+
+
+<script>
+(function(){
+  const btn = document.getElementById('idealDiagPushBtn');
+  const panel = document.getElementById('idealDiagPushPanel');
+  if(!btn || !panel) return;
+
+  function abrirDbDiag(){
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open('idealPushDiagnostico', 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if(!db.objectStoreNames.contains('eventos')){
+          db.createObjectStore('eventos', {keyPath:'id', autoIncrement:true});
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function lerDiag(){
+    panel.style.display = 'block';
+    panel.textContent = 'Lendo diagnóstico Push...';
+
+    const linhas = [];
+    linhas.push('IDEAL — DIAGNÓSTICO PUSH 15.5.2');
+    linhas.push('Permissão: ' + (('Notification' in window) ? Notification.permission : 'não suportado'));
+    linhas.push('Service Worker: ' + (navigator.serviceWorker && navigator.serviceWorker.controller ? 'controlando a página' : 'sem controlador'));
+    linhas.push('URL: ' + location.href);
+    linhas.push('----------------------------------------');
+
+    try{
+      const db = await abrirDbDiag();
+      const tx = db.transaction('eventos','readonly');
+      const store = tx.objectStore('eventos');
+      const eventos = await new Promise((resolve, reject) => {
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => reject(req.error);
+      });
+      db.close();
+
+      if(!eventos.length){
+        linhas.push('Nenhum evento Push gravado ainda.');
+        linhas.push('');
+        linhas.push('Faça o teste no Admin com o PWA em segundo plano e abra este diagnóstico novamente.');
+      }else{
+        eventos.slice(-25).reverse().forEach(ev => {
+          linhas.push('[' + (ev.data || 'sem data') + '] ' + (ev.tipo || 'EVENTO'));
+          if(ev.detalhe) linhas.push(String(ev.detalhe));
+          linhas.push('');
+        });
+      }
+    }catch(err){
+      linhas.push('ERRO AO LER DIAGNÓSTICO: ' + String(err && (err.message || err)));
+    }
+
+    linhas.push('----------------------------------------');
+    linhas.push('Toque novamente em “Diagnóstico Push” para fechar.');
+    panel.textContent = linhas.join('\n');
+  }
+
+  btn.addEventListener('click', async () => {
+    if(panel.style.display === 'block'){
+      panel.style.display = 'none';
+      return;
+    }
+    await lerDiag();
+  });
 })();
 </script>
 
