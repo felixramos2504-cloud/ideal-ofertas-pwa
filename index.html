@@ -508,13 +508,6 @@ body.idealSplashAberta #iosHelp{
     <div id="pushMsg"></div>
   </div>
 
-  <!-- MASTER 12 · ETAPA 15.5.1 — DIAGNÓSTICO PUSH SEMPRE VISÍVEL -->
-  <button id="btnPushDiag" type="button" aria-label="Abrir diagnóstico das notificações"
-    style="display:block!important;position:fixed!important;right:14px!important;bottom:18px!important;z-index:2147483646!important;pointer-events:auto!important;border:0!important;border-radius:999px!important;padding:12px 16px!important;background:#202124!important;color:#fff!important;box-shadow:0 8px 26px rgba(0,0,0,.28)!important;font-weight:900!important;font-size:13px!important;line-height:1.1!important;cursor:pointer!important;visibility:visible!important;opacity:1!important;transform:none!important;">🔎 Diagnóstico Push</button>
-
-  <div id="pushDiagPanel"
-    style="display:none;position:fixed!important;right:14px!important;bottom:72px!important;z-index:2147483647!important;width:min(92vw,600px)!important;max-height:min(62vh,520px)!important;overflow:auto!important;background:#111!important;color:#e8eaed!important;border:1px solid #444!important;border-radius:12px!important;padding:12px!important;box-shadow:0 10px 34px rgba(0,0,0,.38)!important;text-align:left!important;font:12px/1.45 Consolas,Monaco,monospace!important;white-space:pre-wrap!important;word-break:break-word!important;pointer-events:auto!important;visibility:visible!important;opacity:1!important;"></div>
-
   <div id="pushToast" role="status" aria-live="polite">
     <strong id="pushToastTitle">IDEAL Supermercados</strong>
     <span id="pushToastBody"></span>
@@ -564,7 +557,7 @@ body.idealSplashAberta #iosHelp{
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js?v=12156', { scope: './', updateViaCache: 'none' })
+        navigator.serviceWorker.register('./service-worker.js?v=12157', { scope: './', updateViaCache: 'none' })
           .then(reg => console.log('IDEAL PWA ativo:', reg.scope))
           .catch(err => console.error('Erro Service Worker:', err));
       });
@@ -648,8 +641,8 @@ body.idealSplashAberta #iosHelp{
     const VAPID_PUBLIC_KEY =
       "BFqbS_rj0lihvZnpl3n6RBf58k1U5S8i96ziLKok2d19uuV8oo1hv6utVLz2KIUaJYKkdaYpHzuw0T1dVK4_2Mw";
 
-    const IDEAL_PUSH_VERSION = '12.15.6';
-    const IDEAL_SW_URL = './service-worker.js?v=12156';
+    const IDEAL_PUSH_VERSION = '12.15.7-STABLE';
+    const IDEAL_SW_URL = './service-worker.js?v=12157';
 
     const btnPush =
       document.getElementById('btnPush');
