@@ -1,9 +1,9 @@
 /* =========================================================
-   IDEAL SUPERMERCADOS — MASTER 10.0.3 — SEM ABA VISÍVEL DE NOTIFICAÇÕES
+   IDEAL SUPERMERCADOS — MASTER 12 · ETAPA 15.5.2 — DIAGNÓSTICO PUSH
    FIREBASE MESSAGING + PWA — FID
    ========================================================= */
 
-const CACHE_NAME = 'ideal-ofertas-pwa-shell-v13-splash-inteligente-1003';
+const CACHE_NAME = 'ideal-ofertas-pwa-shell-v12-etapa15-5-2-diagnostico';
 
 const STATIC_FILES = [
   './',
