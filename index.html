@@ -564,7 +564,7 @@ body.idealSplashAberta #iosHelp{
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js?v=121551', { scope: './', updateViaCache: 'none' })
+        navigator.serviceWorker.register('./service-worker.js?v=12156', { scope: './', updateViaCache: 'none' })
           .then(reg => console.log('IDEAL PWA ativo:', reg.scope))
           .catch(err => console.error('Erro Service Worker:', err));
       });
@@ -648,8 +648,8 @@ body.idealSplashAberta #iosHelp{
     const VAPID_PUBLIC_KEY =
       "BFqbS_rj0lihvZnpl3n6RBf58k1U5S8i96ziLKok2d19uuV8oo1hv6utVLz2KIUaJYKkdaYpHzuw0T1dVK4_2Mw";
 
-    const IDEAL_PUSH_VERSION = '12.15.5.1';
-    const IDEAL_SW_URL = './service-worker.js?v=121551';
+    const IDEAL_PUSH_VERSION = '12.15.6';
+    const IDEAL_SW_URL = './service-worker.js?v=12156';
 
     const btnPush =
       document.getElementById('btnPush');
@@ -688,8 +688,8 @@ body.idealSplashAberta #iosHelp{
     let tokenConfirmadoBackend = '';
 
     /* MASTER 12 · ETAPA 15 — renovação controlada do registro Push. */
-    const IDEAL_PUSH_RECOVERY_KEY = 'idealPushRecovery12154';
-    const IDEAL_PUSH_REFRESH_KEY = 'idealPushRefresh12154';
+    const IDEAL_PUSH_RECOVERY_KEY = 'idealPushRecovery12156';
+    const IDEAL_PUSH_REFRESH_KEY = 'idealPushRefresh12156';
 
     async function renovarRegistroPush1215(){
       if(!('Notification' in window) || Notification.permission !== 'granted'){
@@ -701,7 +701,7 @@ body.idealSplashAberta #iosHelp{
         try{
           await deleteToken(messaging);
         }catch(err){
-          console.warn('[IDEAL Push 12.15.4] Não havia token anterior para excluir ou a exclusão falhou:', err);
+          console.warn('[IDEAL Push 12.15.6] Não havia token anterior para excluir ou a exclusão falhou:', err);
         }
 
         localStorage.removeItem('idealFcmToken');
@@ -744,7 +744,7 @@ body.idealSplashAberta #iosHelp{
           localStorage.setItem(IDEAL_PUSH_REFRESH_KEY, String(Date.now()));
         }
       }catch(err){
-        console.warn('[IDEAL Push 12.15.4] Atualização periódica pendente:', err);
+        console.warn('[IDEAL Push 12.15.6] Atualização periódica pendente:', err);
       }
     }
 
@@ -1502,12 +1502,18 @@ body.idealSplashAberta #iosHelp{
       pushDiagPanel.textContent = 'Lendo diagnóstico Push...';
 
       const linhas = [];
-      linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.15.5.1');
+      linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.15.6');
       linhas.push('Data: ' + new Date().toLocaleString('pt-BR'));
       linhas.push('Permissão: ' + (('Notification' in window) ? Notification.permission : 'não suportado'));
       linhas.push('Service Worker suportado: ' + ('serviceWorker' in navigator ? 'SIM' : 'NÃO'));
       linhas.push('Página controlada pelo SW: ' + (navigator.serviceWorker && navigator.serviceWorker.controller ? 'SIM' : 'NÃO'));
       linhas.push('Token salvo no PWA: ' + (localStorage.getItem('idealFcmToken') ? 'SIM' : 'NÃO'));
+      linhas.push('Token confirmado no backend: ' + (
+        localStorage.getItem('idealPushTokenSalvoNaPlanilha') ? 'SIM' : 'NÃO'
+      ));
+      linhas.push('Última confirmação backend: ' + (
+        localStorage.getItem('idealPushTokenSalvoEm') || 'ainda não confirmada'
+      ));
 
       try{
         const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration('./') : null;
@@ -1712,7 +1718,7 @@ body.idealSplashAberta #iosHelp{
             await renovarRegistroPush1215();
           }catch(err){
             console.warn(
-              '[IDEAL Push 12.15.4] Recuperação automática pendente:',
+              '[IDEAL Push 12.15.6] Recuperação automática pendente:',
               err
             );
           }
