@@ -1,9 +1,9 @@
 /* =========================================================
-   IDEAL SUPERMERCADOS — MASTER 12 · ETAPA 15.5.1 — DIAGNÓSTICO + CACHE NOVO
+   IDEAL SUPERMERCADOS — MASTER 12 · ETAPA 15.7 — PUSH ESTÁVEL
    FIREBASE MESSAGING + PWA — FID
    ========================================================= */
 
-const CACHE_NAME = 'ideal-ofertas-pwa-shell-v12-etapa15-5-1-diagnostico';
+const CACHE_NAME = 'ideal-ofertas-pwa-shell-v12-etapa15-7-push-estavel';
 
 const STATIC_FILES = [
   './',
