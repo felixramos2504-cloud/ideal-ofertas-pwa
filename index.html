@@ -557,7 +557,7 @@ body.idealSplashAberta #iosHelp{
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js?v=12157', { scope: './', updateViaCache: 'none' })
+        navigator.serviceWorker.register('./service-worker.js?v=12160', { scope: './', updateViaCache: 'none' })
           .then(reg => console.log('IDEAL PWA ativo:', reg.scope))
           .catch(err => console.error('Erro Service Worker:', err));
       });
@@ -622,8 +622,9 @@ body.idealSplashAberta #iosHelp{
 
     import {
       getMessaging,
-      getToken,
-      deleteToken,
+      register as registerMessaging,
+      onRegistered,
+      onUnregistered,
       isSupported,
       onMessage
     } from
@@ -641,8 +642,8 @@ body.idealSplashAberta #iosHelp{
     const VAPID_PUBLIC_KEY =
       "BFqbS_rj0lihvZnpl3n6RBf58k1U5S8i96ziLKok2d19uuV8oo1hv6utVLz2KIUaJYKkdaYpHzuw0T1dVK4_2Mw";
 
-    const IDEAL_PUSH_VERSION = '12.15.7-STABLE';
-    const IDEAL_SW_URL = './service-worker.js?v=12157';
+    const IDEAL_PUSH_VERSION = '12.16.0-FID';
+    const IDEAL_SW_URL = './service-worker.js?v=12160';
 
     const btnPush =
       document.getElementById('btnPush');
@@ -680,64 +681,140 @@ body.idealSplashAberta #iosHelp{
     let ultimoTokenEnviado = '';
     let tokenConfirmadoBackend = '';
 
-    /* MASTER 12 · ETAPA 15 — renovação controlada do registro Push. */
-    const IDEAL_PUSH_RECOVERY_KEY = 'idealPushRecovery12156';
-    const IDEAL_PUSH_REFRESH_KEY = 'idealPushRefresh12156';
+    /* MASTER 12 · FASE 16 — registro Firebase moderno por FID. */
+    const IDEAL_PUSH_RECOVERY_KEY = 'idealPushFidRegistrado12160';
+    const IDEAL_PUSH_REFRESH_KEY = 'idealPushFidRefresh12160';
+
+    let ultimoFidRegistrado =
+      localStorage.getItem('idealFcmToken') || '';
+
+    let resolverRegistroFid = null;
+    let rejeitarRegistroFid = null;
+    let timerRegistroFid = null;
+
+    function concluirEsperaFid_(fid){
+      fid = String(fid || '').trim();
+      if(!fid) return;
+
+      ultimoFidRegistrado = fid;
+
+      localStorage.setItem('idealFcmToken', fid);
+      localStorage.setItem('idealFcmTokenAtualizadoEm', new Date().toISOString());
+      localStorage.setItem('idealPushVersion', IDEAL_PUSH_VERSION);
+      localStorage.setItem(IDEAL_PUSH_RECOVERY_KEY, '1');
+      localStorage.setItem(IDEAL_PUSH_REFRESH_KEY, String(Date.now()));
+
+      atualizarBotaoPush();
+      cadastrarTokenComTentativas(fid);
+
+      if(timerRegistroFid){
+        window.clearTimeout(timerRegistroFid);
+        timerRegistroFid = null;
+      }
+
+      if(resolverRegistroFid){
+        const resolver = resolverRegistroFid;
+        resolverRegistroFid = null;
+        rejeitarRegistroFid = null;
+        resolver(fid);
+      }
+    }
+
+    onRegistered(
+      messaging,
+      installationId => {
+        const fid = String(installationId || '').trim();
+
+        console.log(
+          '[IDEAL Push 12.16] Firebase Installation ID registrado:',
+          fid ? fid.slice(0, 10) + '…' : 'vazio'
+        );
+
+        concluirEsperaFid_(fid);
+      }
+    );
+
+    onUnregistered(
+      messaging,
+      installationId => {
+        console.warn(
+          '[IDEAL Push 12.16] Registro Firebase removido:',
+          String(installationId || '').slice(0, 10) + '…'
+        );
+
+        const atual = localStorage.getItem('idealFcmToken') || '';
+
+        if(
+          installationId &&
+          atual === String(installationId)
+        ){
+          localStorage.removeItem('idealFcmToken');
+          localStorage.removeItem('idealPushTokenSalvoNaPlanilha');
+          localStorage.removeItem('idealPushTokenSalvoEm');
+        }
+      }
+    );
 
     async function renovarRegistroPush1215(){
-      if(!('Notification' in window) || Notification.permission !== 'granted'){
+      if(
+        !('Notification' in window) ||
+        Notification.permission !== 'granted'
+      ){
         return '';
       }
 
-      /* Uma única renovação forçada nesta versão remove tokens antigos/órfãos. */
-      if(localStorage.getItem(IDEAL_PUSH_RECOVERY_KEY) !== '1'){
-        try{
-          await deleteToken(messaging);
-        }catch(err){
-          console.warn('[IDEAL Push 12.15.6] Não havia token anterior para excluir ou a exclusão falhou:', err);
-        }
-
-        localStorage.removeItem('idealFcmToken');
-        localStorage.removeItem('idealPushTokenSalvoNaPlanilha');
-        localStorage.removeItem('idealPushTokenSalvoEm');
-      }
-
-      const token = await obterTokenFcm({
+      return await obterTokenFcm({
         pedirPermissao: false,
         mostrarSucesso: false
       });
-
-      if(token){
-        localStorage.setItem(IDEAL_PUSH_RECOVERY_KEY, '1');
-        localStorage.setItem(IDEAL_PUSH_REFRESH_KEY, String(Date.now()));
-      }
-
-      return token || '';
     }
 
     async function atualizarRegistroPush1215SeNecessario(){
-      if(!('Notification' in window) || Notification.permission !== 'granted'){
+      if(
+        !('Notification' in window) ||
+        Notification.permission !== 'granted'
+      ){
         return;
       }
 
-      const ultimo = Number(localStorage.getItem(IDEAL_PUSH_REFRESH_KEY) || 0);
-      const seisHoras = 6 * 60 * 60 * 1000;
+      const ultimo =
+        Number(
+          localStorage.getItem(
+            IDEAL_PUSH_REFRESH_KEY
+          ) || 0
+        );
 
-      if(ultimo && (Date.now() - ultimo) < seisHoras){
-        const tokenAtual = localStorage.getItem('idealFcmToken') || '';
-        if(tokenAtual){
-          cadastrarTokenComTentativas(tokenAtual);
+      const seisHoras =
+        6 * 60 * 60 * 1000;
+
+      if(
+        ultimo &&
+        (Date.now() - ultimo) < seisHoras
+      ){
+        const fidAtual =
+          localStorage.getItem(
+            'idealFcmToken'
+          ) || '';
+
+        if(fidAtual){
+          cadastrarTokenComTentativas(
+            fidAtual
+          );
         }
+
         return;
       }
 
       try{
-        const token = await obterTokenFcm({pedirPermissao:false, mostrarSucesso:false});
-        if(token){
-          localStorage.setItem(IDEAL_PUSH_REFRESH_KEY, String(Date.now()));
-        }
+        await obterTokenFcm({
+          pedirPermissao: false,
+          mostrarSucesso: false
+        });
       }catch(err){
-        console.warn('[IDEAL Push 12.15.6] Atualização periódica pendente:', err);
+        console.warn(
+          '[IDEAL Push 12.16] Atualização do registro Firebase pendente:',
+          err
+        );
       }
     }
 
@@ -1195,6 +1272,7 @@ body.idealSplashAberta #iosHelp{
               : 'A permissão para notificações não foi concedida.'
           );
         }
+
         return '';
       }
 
@@ -1216,49 +1294,53 @@ body.idealSplashAberta #iosHelp{
           ? registration
           : await navigator.serviceWorker.ready;
 
-      /*
-       * MASTER 9.7.3:
-       * para registrar/enviar Push ao dispositivo usamos o
-       * FCM REGISTRATION TOKEN, validado no teste de background.
-       */
-      const token =
-        await getToken(
-          messaging,
-          {
-            vapidKey:
-              VAPID_PUBLIC_KEY,
+      const fidPromise =
+        new Promise((resolve, reject) => {
+          resolverRegistroFid = resolve;
+          rejeitarRegistroFid = reject;
 
-            serviceWorkerRegistration:
-              swRegistration
+          if(timerRegistroFid){
+            window.clearTimeout(timerRegistroFid);
           }
-        );
 
-      if(!token){
+          timerRegistroFid =
+            window.setTimeout(() => {
+              resolverRegistroFid = null;
+              rejeitarRegistroFid = null;
+              timerRegistroFid = null;
+
+              reject(
+                new Error(
+                  'O Firebase não confirmou o registro deste aparelho dentro do tempo esperado.'
+                )
+              );
+            }, 15000);
+        });
+
+      /*
+       * API atual do Firebase:
+       * register() estabelece o registro FCM e onRegistered()
+       * entrega o Firebase Installation ID (FID).
+       */
+      await registerMessaging(
+        messaging,
+        {
+          vapidKey:
+            VAPID_PUBLIC_KEY,
+
+          serviceWorkerRegistration:
+            swRegistration
+        }
+      );
+
+      const fid =
+        await fidPromise;
+
+      if(!fid){
         throw new Error(
-          'O Firebase não retornou o token FCM do aparelho.'
+          'O Firebase não retornou o identificador do aparelho.'
         );
       }
-
-      localStorage.setItem(
-        'idealFcmToken',
-        token
-      );
-
-      localStorage.setItem(
-        'idealFcmTokenAtualizadoEm',
-        new Date().toISOString()
-      );
-
-      localStorage.setItem(
-        'idealPushVersion',
-        IDEAL_PUSH_VERSION
-      );
-
-      atualizarBotaoPush();
-
-      cadastrarTokenComTentativas(
-        token
-      );
 
       if(mostrarSucesso){
         mostrarMensagemPush(
@@ -1266,7 +1348,7 @@ body.idealSplashAberta #iosHelp{
         );
       }
 
-      return token;
+      return fid;
     }
 
     /* MASTER 12 · ETAPA 15 — CONTROLE DO CONVITE DE NOTIFICAÇÕES */
@@ -1495,13 +1577,13 @@ body.idealSplashAberta #iosHelp{
       pushDiagPanel.textContent = 'Lendo diagnóstico Push...';
 
       const linhas = [];
-      linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.15.6');
+      linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.16.0 FID');
       linhas.push('Data: ' + new Date().toLocaleString('pt-BR'));
       linhas.push('Permissão: ' + (('Notification' in window) ? Notification.permission : 'não suportado'));
       linhas.push('Service Worker suportado: ' + ('serviceWorker' in navigator ? 'SIM' : 'NÃO'));
       linhas.push('Página controlada pelo SW: ' + (navigator.serviceWorker && navigator.serviceWorker.controller ? 'SIM' : 'NÃO'));
-      linhas.push('Token salvo no PWA: ' + (localStorage.getItem('idealFcmToken') ? 'SIM' : 'NÃO'));
-      linhas.push('Token confirmado no backend: ' + (
+      linhas.push('Identificador Firebase salvo no PWA: ' + (localStorage.getItem('idealFcmToken') ? 'SIM' : 'NÃO'));
+      linhas.push('Identificador confirmado no backend: ' + (
         localStorage.getItem('idealPushTokenSalvoNaPlanilha') ? 'SIM' : 'NÃO'
       ));
       linhas.push('Última confirmação backend: ' + (
@@ -1599,17 +1681,13 @@ body.idealSplashAberta #iosHelp{
           'granted'
         ){
           try{
-            /* Clique manual passa a funcionar também como reparo do aparelho. */
-            try{ await deleteToken(messaging); }catch(_){}
-            localStorage.removeItem('idealFcmToken');
-            localStorage.removeItem(IDEAL_PUSH_RECOVERY_KEY);
-
+            /* Fase 16: refaz o registro Firebase sem excluir a assinatura Push. */
             const token =
               await renovarRegistroPush1215();
 
             if(token){
               mostrarMensagemPush(
-                '✅ Notificações reparadas e dispositivo recadastrado.'
+                '✅ Notificações registradas novamente neste aparelho.'
               );
             }
           }catch(err){
@@ -1821,11 +1899,11 @@ body.idealSplashAberta #iosHelp{
  async function ler(){
    p.style.display='block';
    const linhas=[];
-   linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH FASE 16');
+   linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.16.0 FID');
    linhas.push('Data: '+new Date().toLocaleString('pt-BR'));
    linhas.push('Permissão: '+(('Notification' in window)?Notification.permission:'não suportado'));
-   linhas.push('Token salvo no PWA: '+(localStorage.getItem('idealFcmToken')?'SIM':'NÃO'));
-   linhas.push('Token confirmado no backend: '+(localStorage.getItem('idealPushTokenSalvoNaPlanilha')?'SIM':'NÃO'));
+   linhas.push('Identificador Firebase salvo no PWA: '+(localStorage.getItem('idealFcmToken')?'SIM':'NÃO'));
+   linhas.push('Identificador confirmado no backend: '+(localStorage.getItem('idealPushTokenSalvoNaPlanilha')?'SIM':'NÃO'));
    linhas.push('Última confirmação backend: '+(localStorage.getItem('idealPushTokenSalvoEm')||'não confirmada'));
    linhas.push('');
    linhas.push('ÚLTIMOS EVENTOS:');
