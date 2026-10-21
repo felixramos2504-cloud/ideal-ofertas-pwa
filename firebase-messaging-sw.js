@@ -1,9 +1,9 @@
 /* =========================================================
-   IDEAL SUPERMERCADOS — MASTER 12 · FASE 17.1 — ATIVAR AVISOS
+   IDEAL SUPERMERCADOS — MASTER 12 · FASE 17.6 — FOCUS ROUTER
    FIREBASE MESSAGING SERVICE WORKER OFICIAL
    ========================================================= */
 
-const CACHE_NAME = 'ideal-ofertas-pwa-shell-v12-fase17-1-ativar-avisos';
+const CACHE_NAME = 'ideal-ofertas-pwa-shell-v12-fase17-6-focus-router';
 
 const STATIC_FILES = [
   './',
@@ -104,6 +104,185 @@ self.addEventListener('pushsubscriptionchange', event => {
 });
 
 /*
+ * FASE 17.6 — ROTEADOR PUSH DO IDEAL
+ *
+ * O Firebase considera qualquer WindowClient "visible" como foreground.
+ * Em Android/PWA isso pode incluir outra aba/janela do mesmo site.
+ *
+ * Aqui usamos client.focused:
+ * - existe cliente focado -> envia para a página;
+ * - nenhum cliente focado -> mostra notificação do sistema.
+ *
+ * stopImmediatePropagation() impede que o listener interno do Firebase
+ * processe o mesmo Push novamente e gere decisão/duplicidade diferente.
+ */
+self.addEventListener('push', event => {
+  let payload = null;
+
+  try{
+    payload =
+      event.data
+        ? event.data.json()
+        : null;
+  }catch(err){
+    payload = null;
+  }
+
+  /*
+   * Se não for um payload JSON do FCM, deixamos o Firebase tratar.
+   */
+  if(!payload){
+    return;
+  }
+
+  event.stopImmediatePropagation();
+
+  event.waitUntil((async () => {
+    const notification =
+      payload.notification || {};
+
+    const data =
+      payload.data || {};
+
+    const fcmOptions =
+      payload.fcmOptions || {};
+
+    const clientes =
+      await self.clients.matchAll({
+        type: 'window',
+        includeUncontrolled: true
+      });
+
+    const focados =
+      clientes.filter(client =>
+        client.focused === true
+      );
+
+    await logDiag(
+      'PUSH_ROUTER_RECEBIDO',
+      {
+        clientes: clientes.length,
+        focados: focados.length,
+        estados:
+          clientes.map(client => ({
+            focused: !!client.focused,
+            visibilityState:
+              client.visibilityState || '',
+            url: client.url || ''
+          })),
+        title:
+          notification.title ||
+          data.title ||
+          '',
+        fcmMessageId:
+          payload.fcmMessageId ||
+          ''
+      }
+    );
+
+    /*
+     * Usuário está realmente olhando uma janela do IDEAL.
+     */
+    if(focados.length){
+      const mensagem = {
+        type: 'IDEAL_PUSH',
+        payload: {
+          notification: notification,
+          data: data,
+          fcmOptions: fcmOptions
+        }
+      };
+
+      focados.forEach(client => {
+        try{
+          client.postMessage(mensagem);
+        }catch(_){}
+      });
+
+      await logDiag(
+        'PUSH_ROUTER_PAGINA_FOCADA',
+        {
+          focados: focados.length
+        }
+      );
+
+      return;
+    }
+
+    /*
+     * Nenhuma janela está focada: isso é background para o IDEAL.
+     * Mostramos diretamente a notificação do sistema.
+     */
+    const title =
+      notification.title ||
+      data.title ||
+      'IDEAL Supermercados';
+
+    const body =
+      notification.body ||
+      data.body ||
+      'Você recebeu uma nova atualização.';
+
+    const url =
+      fcmOptions.link ||
+      notification.click_action ||
+      data.url ||
+      './';
+
+    try{
+      await self.registration.showNotification(
+        title,
+        {
+          body: body,
+          icon:
+            notification.icon ||
+            data.icon ||
+            './icon-192.png',
+          badge:
+            notification.badge ||
+            data.badge ||
+            './icon-192.png',
+          tag:
+            notification.tag ||
+            data.tag ||
+            (
+              payload.fcmMessageId
+                ? 'ideal-' + payload.fcmMessageId
+                : 'ideal-ofertas'
+            ),
+          renotify: true,
+          data: {
+            url: url
+          }
+        }
+      );
+
+      await logDiag(
+        'PUSH_ROUTER_SYSTEM_OK',
+        {
+          title: title,
+          body: body
+        }
+      );
+    }catch(err){
+      await logDiag(
+        'PUSH_ROUTER_SYSTEM_ERRO',
+        {
+          mensagem:
+            String(
+              err &&
+              (err.message || err) ||
+              err
+            )
+        }
+      );
+
+      throw err;
+    }
+  })());
+});
+
+/*
  * Firebase Messaging oficial no arquivo exigido pelo FCM Web.
  */
 importScripts(
@@ -141,7 +320,7 @@ messaging.onBackgroundMessage(payload => {
   };
 
   console.log(
-    '[IDEAL Push 12.17.1] Background Firebase:',
+    '[IDEAL Push 12.17.6] Background Firebase:',
     payload
   );
 
