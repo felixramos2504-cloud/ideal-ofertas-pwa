@@ -1,9 +1,9 @@
 /* =========================================================
-   IDEAL SUPERMERCADOS — MASTER 12 · FASE 16.2 — PUSH ANDROID EM SEGUNDO PLANO
+   IDEAL SUPERMERCADOS — MASTER 12 · FASE 16.3 — NOTIFICATION + DATA
    FIREBASE MESSAGING + PWA — FID
    ========================================================= */
 
-const CACHE_NAME = 'ideal-ofertas-pwa-shell-v12-fase16-2-background';
+const CACHE_NAME = 'ideal-ofertas-pwa-shell-v12-fase16-3-notification';
 
 const STATIC_FILES = [
   './',
@@ -125,6 +125,31 @@ self.addEventListener('push', event => {
 
     const data =
       (bruto && bruto.data) || {};
+
+    /*
+     * FASE 16.3
+     * Se o servidor enviou o payload oficial "notification",
+     * deixamos o Firebase Messaging/Chrome exibir a notificação
+     * automaticamente em segundo plano. Não chamamos showNotification()
+     * aqui para evitar duplicidade.
+     */
+    if(
+      notification &&
+      (
+        notification.title ||
+        notification.body
+      )
+    ){
+      await logDiag(
+        'PUSH_NOTIFICATION_AUTOMATICA_FCM',
+        {
+          title: notification.title || data.title || '',
+          body: notification.body || data.body || ''
+        }
+      );
+
+      return;
+    }
 
     const title =
       notification.title ||
