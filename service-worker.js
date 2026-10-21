@@ -1,9 +1,9 @@
 /* =========================================================
-   IDEAL SUPERMERCADOS — MASTER 12 · FASE 16.3 — NOTIFICATION + DATA
+   IDEAL SUPERMERCADOS — MASTER 12 · FASE 16.4 — FIREBASE BACKGROUND OFICIAL
    FIREBASE MESSAGING + PWA — FID
    ========================================================= */
 
-const CACHE_NAME = 'ideal-ofertas-pwa-shell-v12-fase16-3-notification';
+const CACHE_NAME = 'ideal-ofertas-pwa-shell-v12-fase16-4-firebase-background';
 
 const STATIC_FILES = [
   './',
@@ -73,197 +73,6 @@ async function logDiag(tipo, detalhe){
     );
   }
 }
-
-self.addEventListener('push', event => {
-  event.waitUntil((async () => {
-    let bruto = null;
-    let resumo = 'evento push sem payload';
-
-    try{
-      if(event.data){
-        try{
-          bruto = event.data.json();
-        }catch(_){
-          resumo = event.data.text();
-        }
-
-        if(bruto){
-          resumo = bruto;
-        }else if(
-          typeof resumo === 'string' &&
-          resumo.length > 2500
-        ){
-          resumo = resumo.slice(0, 2500) + '...';
-        }
-      }
-    }catch(err){
-      resumo = 'erro ao ler payload: ' + String(err);
-    }
-
-    await logDiag(
-      'PUSH_RAW_RECEBIDO',
-      resumo
-    );
-
-    /*
-     * FASE 16.1 — EXIBIÇÃO DIRETA PELO EVENTO PUSH
-     *
-     * O Push FID pode chegar ao Service Worker sem passar pelo
-     * onBackgroundMessage. Portanto a decisão de exibir a
-     * notificação é feita aqui, no evento nativo "push".
-     */
-    if(!bruto){
-      try{
-        if(event.data){
-          bruto = JSON.parse(event.data.text());
-        }
-      }catch(_){}
-    }
-
-    const notification =
-      (bruto && bruto.notification) || {};
-
-    const data =
-      (bruto && bruto.data) || {};
-
-    /*
-     * FASE 16.3
-     * Se o servidor enviou o payload oficial "notification",
-     * deixamos o Firebase Messaging/Chrome exibir a notificação
-     * automaticamente em segundo plano. Não chamamos showNotification()
-     * aqui para evitar duplicidade.
-     */
-    if(
-      notification &&
-      (
-        notification.title ||
-        notification.body
-      )
-    ){
-      await logDiag(
-        'PUSH_NOTIFICATION_AUTOMATICA_FCM',
-        {
-          title: notification.title || data.title || '',
-          body: notification.body || data.body || ''
-        }
-      );
-
-      return;
-    }
-
-    const title =
-      notification.title ||
-      data.title ||
-      'IDEAL Supermercados';
-
-    const body =
-      notification.body ||
-      data.body ||
-      'Você recebeu uma nova atualização.';
-
-    const icon =
-      notification.icon ||
-      data.icon ||
-      './icon-192.png';
-
-    const tag =
-      notification.tag ||
-      data.tag ||
-      (
-        bruto && bruto.fcmMessageId
-          ? 'ideal-' + bruto.fcmMessageId
-          : 'ideal-ofertas'
-      );
-
-    const url =
-      (
-        bruto &&
-        bruto.fcmOptions &&
-        bruto.fcmOptions.link
-      ) ||
-      data.url ||
-      './';
-
-    let clientes = [];
-
-    try{
-      clientes =
-        await self.clients.matchAll({
-          type: 'window',
-          includeUncontrolled: true
-        });
-    }catch(_){}
-
-    /*
-     * FASE 16.2
-     * Em Android/PWA, visibilityState pode continuar como "visible"
-     * mesmo depois de o usuário sair para a tela inicial. Por isso,
-     * usamos WindowClient.focused para decidir se o app está realmente
-     * em primeiro plano.
-     */
-    const appEmFoco =
-      clientes.some(
-        client =>
-          client &&
-          client.focused === true
-      );
-
-    if(appEmFoco){
-      await logDiag(
-        'PUSH_APP_EM_FOCO',
-        {
-          title: title,
-          body: body
-        }
-      );
-
-      return;
-    }
-
-    try{
-      await self.registration.showNotification(
-        title,
-        {
-          body: body,
-          icon: icon,
-          badge:
-            data.badge ||
-            './icon-192.png',
-          tag: tag,
-          renotify: true,
-          requireInteraction: false,
-          data: {
-            url: url
-          }
-        }
-      );
-
-      await logDiag(
-        'SHOW_NOTIFICATION_OK',
-        {
-          origem: 'PUSH_RAW_DIRETO',
-          title: title,
-          body: body
-        }
-      );
-    }catch(err){
-      await logDiag(
-        'SHOW_NOTIFICATION_ERRO',
-        {
-          origem: 'PUSH_RAW_DIRETO',
-          mensagem:
-            String(
-              err &&
-              (err.stack || err.message) ||
-              err
-            )
-        }
-      );
-
-      throw err;
-    }
-  })());
-});
 
 self.addEventListener('pushsubscriptionchange', event => {
   event.waitUntil(
@@ -336,35 +145,123 @@ const messaging = firebase.messaging();
  * O handler cria a notificação do sistema explicitamente.
  */
 messaging.onBackgroundMessage(payload => {
+  const notification =
+    (payload && payload.notification) || {};
+
+  const data =
+    (payload && payload.data) || {};
+
+  const fcmOptions =
+    (payload && payload.fcmOptions) || {};
+
   const resumo = {
-    notification:
-      payload && payload.notification
-        ? payload.notification
-        : null,
-    data:
-      payload && payload.data
-        ? payload.data
-        : null,
-    fcmOptions:
-      payload && payload.fcmOptions
-        ? payload.fcmOptions
-        : null
+    notification: notification,
+    data: data,
+    fcmOptions: fcmOptions
   };
 
   console.log(
-    '[IDEAL Push 12.16.1] Mensagem Firebase em segundo plano:',
+    '[IDEAL Push 12.16.4] Background Firebase:',
     payload
   );
 
-  /*
-   * FASE 16.1
-   * O evento nativo "push" é o responsável exclusivo por
-   * showNotification(), evitando duplicidade.
-   */
-  return logDiag(
-    'FCM_BACKGROUND_RECEBIDO',
-    resumo
-  );
+  return (async () => {
+    await logDiag(
+      'FCM_BACKGROUND_RECEBIDO',
+      resumo
+    );
+
+    /*
+     * FASE 16.4 — PADRÃO OFICIAL FIREBASE
+     *
+     * Se existir payload.notification, o próprio FCM/Chrome
+     * exibe a notificação do sistema em segundo plano.
+     * Não chamamos showNotification() novamente para evitar duplicidade.
+     */
+    if(
+      notification &&
+      (
+        notification.title ||
+        notification.body
+      )
+    ){
+      await logDiag(
+        'FCM_NOTIFICATION_AUTOMATICA',
+        {
+          title:
+            notification.title ||
+            data.title ||
+            '',
+          body:
+            notification.body ||
+            data.body ||
+            ''
+        }
+      );
+
+      return;
+    }
+
+    /*
+     * Fallback apenas para mensagens DATA-ONLY.
+     */
+    const title =
+      data.title ||
+      'IDEAL Supermercados';
+
+    const options = {
+      body:
+        data.body ||
+        'Você recebeu uma nova atualização.',
+      icon:
+        data.icon ||
+        './icon-192.png',
+      badge:
+        data.badge ||
+        './icon-192.png',
+      tag:
+        data.tag ||
+        'ideal-ofertas',
+      renotify: true,
+      data: {
+        url:
+          fcmOptions.link ||
+          data.url ||
+          './'
+      }
+    };
+
+    try{
+      await self.registration.showNotification(
+        title,
+        options
+      );
+
+      await logDiag(
+        'SHOW_NOTIFICATION_OK',
+        {
+          origem: 'FCM_DATA_FALLBACK',
+          title: title,
+          body: options.body
+        }
+      );
+    }catch(err){
+      await logDiag(
+        'SHOW_NOTIFICATION_ERRO',
+        {
+          origem: 'FCM_DATA_FALLBACK',
+          mensagem:
+            String(
+              err &&
+              (err.stack || err.message) ||
+              err
+            )
+        }
+      );
+
+      throw err;
+    }
+  })();
 });
 
 /* MASTER 12 · ETAPA 15.4 — teste local do canal de notificações. */
