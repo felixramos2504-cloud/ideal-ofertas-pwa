@@ -1,0 +1,4 @@
+IDEAL OFERTAS — BUILD ANDROID
+Assinatura de teste estável: ATIVA
+Versão do diagnóstico: 1.1-DIAG-PUSH
+A partir deste build, os APKs de teste usam a mesma chave de assinatura.
