@@ -3,7 +3,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'br.com.idealsupermercados.ofertas',
-  appName: 'IDEAL Ofertas',
+  appName: 'Ideal Ofertas',
   webDir: 'dist',
   plugins: {
     PushNotifications: {
