@@ -557,7 +557,7 @@ body.idealSplashAberta #iosHelp{
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./firebase-messaging-sw.js', { scope: './', updateViaCache: 'none' })
+        navigator.serviceWorker.register('./service-worker.js?v=12168', { scope: './', updateViaCache: 'none' })
           .then(reg => console.log('IDEAL PWA ativo:', reg.scope))
           .catch(err => console.error('Erro Service Worker:', err));
       });
@@ -623,7 +623,6 @@ body.idealSplashAberta #iosHelp{
     import {
       getMessaging,
       register as registerMessaging,
-      unregister as unregisterMessaging,
       onRegistered,
       onUnregistered,
       isSupported,
@@ -643,8 +642,8 @@ body.idealSplashAberta #iosHelp{
     const VAPID_PUBLIC_KEY =
       "BFqbS_rj0lihvZnpl3n6RBf58k1U5S8i96ziLKok2d19uuV8oo1hv6utVLz2KIUaJYKkdaYpHzuw0T1dVK4_2Mw";
 
-    const IDEAL_PUSH_VERSION = '12.16.7-SW-BIND';
-    const IDEAL_SW_URL = './firebase-messaging-sw.js';
+    const IDEAL_PUSH_VERSION = '12.16.8-RECUPERACAO-165';
+    const IDEAL_SW_URL = './service-worker.js?v=12168';
 
     const btnPush =
       document.getElementById('btnPush');
@@ -685,7 +684,6 @@ body.idealSplashAberta #iosHelp{
     /* MASTER 12 · FASE 16 — registro Firebase moderno por FID. */
     const IDEAL_PUSH_RECOVERY_KEY = 'idealPushFidRegistrado12160';
     const IDEAL_PUSH_REFRESH_KEY = 'idealPushFidRefresh12160';
-    const IDEAL_PUSH_SW_BIND_KEY = 'idealPushSwBind12167';
 
     let ultimoFidRegistrado =
       localStorage.getItem('idealFcmToken') || '';
@@ -1296,41 +1294,6 @@ body.idealSplashAberta #iosHelp{
           ? registration
           : await navigator.serviceWorker.ready;
 
-      /*
-       * FASE 16.7 — VÍNCULO EXPLÍCITO DO FID AO SERVICE WORKER
-       *
-       * O GitHub Pages publica o app em /ideal-ofertas-pwa/.
-       * Sem informar serviceWorkerRegistration, o Firebase pode procurar
-       * o worker padrão na raiz do domínio. Fazemos uma única limpeza do
-       * registro FCM e o recriamos ligado ao worker correto deste PWA.
-       */
-      if(
-        localStorage.getItem(
-          IDEAL_PUSH_SW_BIND_KEY
-        ) !== '1'
-      ){
-        try{
-          await unregisterMessaging(
-            messaging
-          );
-        }catch(err){
-          console.warn(
-            '[IDEAL Push 12.16.7] Registro anterior não pôde ser removido ou já não existia:',
-            err
-          );
-        }
-
-        localStorage.removeItem(
-          'idealFcmToken'
-        );
-        localStorage.removeItem(
-          'idealPushTokenSalvoNaPlanilha'
-        );
-        localStorage.removeItem(
-          'idealPushTokenSalvoEm'
-        );
-      }
-
       const fidPromise =
         new Promise((resolve, reject) => {
           resolverRegistroFid = resolve;
@@ -1378,11 +1341,6 @@ body.idealSplashAberta #iosHelp{
           'O Firebase não retornou o identificador do aparelho.'
         );
       }
-
-      localStorage.setItem(
-        IDEAL_PUSH_SW_BIND_KEY,
-        '1'
-      );
 
       if(mostrarSucesso){
         mostrarMensagemPush(
@@ -1619,7 +1577,7 @@ body.idealSplashAberta #iosHelp{
       pushDiagPanel.textContent = 'Lendo diagnóstico Push...';
 
       const linhas = [];
-      linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.16.7 SW BIND');
+      linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.16.8 RECUPERAÇÃO 16.5');
       linhas.push('Data: ' + new Date().toLocaleString('pt-BR'));
       linhas.push('Permissão: ' + (('Notification' in window) ? Notification.permission : 'não suportado'));
       linhas.push('Service Worker suportado: ' + ('serviceWorker' in navigator ? 'SIM' : 'NÃO'));
@@ -1779,13 +1737,10 @@ body.idealSplashAberta #iosHelp{
       messaging,
       payload => {
         console.log(
-          '[IDEAL Push 12.16.6] Mensagem em primeiro plano:',
+          '[IDEAL Push 12.16.5] Mensagem em primeiro plano:',
           payload
         );
-
-        mostrarToastPush(
-          payload
-        );
+        /* A exibição fica a cargo do Service Worker autônomo. */
       }
     );
 
@@ -1941,7 +1896,7 @@ body.idealSplashAberta #iosHelp{
  async function ler(){
    p.style.display='block';
    const linhas=[];
-   linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.16.7 SW BIND');
+   linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.16.8 RECUPERAÇÃO 16.5');
    linhas.push('Data: '+new Date().toLocaleString('pt-BR'));
    linhas.push('Permissão: '+(('Notification' in window)?Notification.permission:'não suportado'));
    linhas.push('Identificador Firebase salvo no PWA: '+(localStorage.getItem('idealFcmToken')?'SIM':'NÃO'));
