@@ -643,7 +643,7 @@ body.idealSplashAberta #iosHelp{
     const VAPID_PUBLIC_KEY =
       "BFqbS_rj0lihvZnpl3n6RBf58k1U5S8i96ziLKok2d19uuV8oo1hv6utVLz2KIUaJYKkdaYpHzuw0T1dVK4_2Mw";
 
-    const IDEAL_PUSH_VERSION = '12.17.3-REPARO-CANAL';
+    const IDEAL_PUSH_VERSION = '12.17.4-DIAG-FOREGROUND';
     const IDEAL_SW_URL = './firebase-messaging-sw.js?v=12171';
 
     const btnPush =
@@ -1671,7 +1671,7 @@ body.idealSplashAberta #iosHelp{
       pushDiagPanel.textContent = 'Lendo diagnóstico Push...';
 
       const linhas = [];
-      linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.17.3 REPARO CANAL');
+      linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.17.4 FOREGROUND');
       linhas.push('Data: ' + new Date().toLocaleString('pt-BR'));
       linhas.push('Permissão: ' + (('Notification' in window) ? Notification.permission : 'não suportado'));
       linhas.push('Service Worker suportado: ' + ('serviceWorker' in navigator ? 'SIM' : 'NÃO'));
@@ -1683,6 +1683,8 @@ body.idealSplashAberta #iosHelp{
       linhas.push('Última confirmação backend: ' + (
         localStorage.getItem('idealPushTokenSalvoEm') || 'ainda não confirmada'
       ));
+      linhas.push('Visibilidade da página: ' + String(document.visibilityState || ''));
+      linhas.push('Navegador/dispositivo: ' + String(navigator.userAgent || '').slice(0,220));
 
       try{
         const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration('./') : null;
@@ -1840,14 +1842,83 @@ body.idealSplashAberta #iosHelp{
     );
 
     /*
+     * FASE 17.4 — LOG DA ENTREGA EM PRIMEIRO PLANO
+     * Usa o mesmo IndexedDB do Service Worker para diferenciar:
+     * - mensagem que acordou o SW;
+     * - mensagem que só chegou quando a página abriu.
+     */
+    async function logDiagPagina174(tipo, detalhe){
+      try{
+        const db = await new Promise((resolve, reject) => {
+          const req = indexedDB.open('idealPushDiagnostico', 1);
+
+          req.onupgradeneeded = () => {
+            const d = req.result;
+            if(!d.objectStoreNames.contains('eventos')){
+              d.createObjectStore(
+                'eventos',
+                { keyPath:'id', autoIncrement:true }
+              );
+            }
+          };
+
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction('eventos', 'readwrite');
+
+          tx.objectStore('eventos').add({
+            data: new Date().toISOString(),
+            tipo: String(tipo || ''),
+            detalhe:
+              typeof detalhe === 'string'
+                ? detalhe
+                : JSON.stringify(detalhe || {})
+          });
+
+          tx.oncomplete = resolve;
+          tx.onerror = () => reject(tx.error);
+          tx.onabort = () => reject(tx.error);
+        });
+
+        db.close();
+      }catch(err){
+        console.warn(
+          '[IDEAL Push 12.17.4] Falha ao registrar diagnóstico da página:',
+          err
+        );
+      }
+    }
+
+    /*
      * Mensagem recebida com o PWA aberto.
      */
     onMessage(
       messaging,
       payload => {
         console.log(
-          '[IDEAL Push 12.16.6] Mensagem em primeiro plano:',
+          '[IDEAL Push 12.17.4] Mensagem em primeiro plano:',
           payload
+        );
+
+        logDiagPagina174(
+          'PAGE_ONMESSAGE_RECEBIDO',
+          {
+            visibilityState:
+              document.visibilityState || '',
+            hidden:
+              !!document.hidden,
+            title:
+              payload?.notification?.title ||
+              payload?.data?.title ||
+              '',
+            body:
+              payload?.notification?.body ||
+              payload?.data?.body ||
+              ''
+          }
         );
 
         mostrarToastPush(
@@ -2145,12 +2216,14 @@ body.idealSplashAberta #iosHelp{
  async function ler(){
    p.style.display='block';
    const linhas=[];
-   linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.17.3 REPARO CANAL');
+   linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.17.4 FOREGROUND');
    linhas.push('Data: '+new Date().toLocaleString('pt-BR'));
    linhas.push('Permissão: '+(('Notification' in window)?Notification.permission:'não suportado'));
    linhas.push('Identificador Firebase salvo no PWA: '+(localStorage.getItem('idealFcmToken')?'SIM':'NÃO'));
    linhas.push('Identificador confirmado no backend: '+(localStorage.getItem('idealPushTokenSalvoNaPlanilha')?'SIM':'NÃO'));
    linhas.push('Última confirmação backend: '+(localStorage.getItem('idealPushTokenSalvoEm')||'não confirmada'));
+   linhas.push('Visibilidade da página: '+String(document.visibilityState||''));
+   linhas.push('Navegador/dispositivo: '+String(navigator.userAgent||'').slice(0,220));
 
    try{
      const reg=('serviceWorker' in navigator)?await navigator.serviceWorker.getRegistration('./'):null;
