@@ -1170,6 +1170,25 @@ body.idealSplashAberta #iosHelp{
           event.data || {};
 
         if(
+          mensagem.type ===
+          'IDEAL_NATIVE_DIAG_PING'
+        ){
+          try{
+            window.parent.postMessage(
+              {
+                type:
+                  'IDEAL_NATIVE_DIAG_PONG',
+                pontePronta:
+                  !!ponteAppsScriptPronta
+              },
+              '*'
+            );
+          }catch(_){}
+
+          return;
+        }
+
+        if(
           mensagem.type !==
           'IDEAL_NATIVE_PUSH_TOKEN'
         ){
@@ -1211,6 +1230,18 @@ body.idealSplashAberta #iosHelp{
           'idealNativePushRecebidoEm',
           new Date().toISOString()
         );
+
+        try{
+          window.parent.postMessage(
+            {
+              type:
+                'IDEAL_NATIVE_TOKEN_RECEBIDO',
+              tokenSuffix:
+                token.slice(-12)
+            },
+            '*'
+          );
+        }catch(_){}
 
         const tentativas =
           [0, 500, 1500, 3500, 7000];
@@ -1446,6 +1477,24 @@ body.idealSplashAberta #iosHelp{
           );
 
           return;
+        }
+
+        if(
+          window.IDEAL_NATIVE_ANDROID &&
+          idealNativePushPendente
+        ){
+          try{
+            window.parent.postMessage(
+              {
+                type:
+                  'IDEAL_NATIVE_PUSH_BACKEND_ERRO',
+                erro:
+                  mensagem.erro ||
+                  'erro desconhecido'
+              },
+              '*'
+            );
+          }catch(_){}
         }
 
         console.warn(
