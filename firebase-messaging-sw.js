@@ -1,9 +1,9 @@
 /* =========================================================
-   IDEAL SUPERMERCADOS — MASTER 12 · FASE 16.6
+   IDEAL SUPERMERCADOS — MASTER 12 · FASE 17.0 — FID CLEAN
    FIREBASE MESSAGING SERVICE WORKER OFICIAL
    ========================================================= */
 
-const CACHE_NAME = 'ideal-ofertas-pwa-shell-v12-fase16-6-fcm-oficial';
+const CACHE_NAME = 'ideal-ofertas-pwa-shell-v12-fase17-0-fid-clean';
 
 const STATIC_FILES = [
   './',
@@ -141,7 +141,7 @@ messaging.onBackgroundMessage(payload => {
   };
 
   console.log(
-    '[IDEAL Push 12.16.6] Background Firebase:',
+    '[IDEAL Push 12.17.0] Background Firebase:',
     payload
   );
 
