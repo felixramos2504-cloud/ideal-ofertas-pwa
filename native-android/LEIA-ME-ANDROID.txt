@@ -1,0 +1,36 @@
+IDEAL OFERTAS — APP ANDROID NATIVO
+
+Base preparada com:
+- Capacitor 8
+- Push Notifications oficial do Capacitor
+- Firebase Cloud Messaging nativo
+- App ID: br.com.idealsupermercados.ofertas
+
+ANTES DE GERAR O APK:
+1. No Firebase Console, abra o projeto "ideal-ofertas".
+2. Adicione um aplicativo Android.
+3. Use exatamente este nome de pacote:
+   br.com.idealsupermercados.ofertas
+4. Baixe o arquivo google-services.json.
+5. Coloque esse arquivo em:
+   native-android/google-services.json
+
+BUILD LOCAL:
+1. Instale Node.js 22 ou superior.
+2. Entre na pasta native-android.
+3. Execute:
+   npm install
+   npm run build
+   npx cap add android
+4. Copie google-services.json para:
+   native-android/android/app/google-services.json
+5. Execute:
+   npx cap sync android
+   npx cap open android
+
+O Android Studio abrirá o projeto para gerar/testar o APK.
+
+IMPORTANTE:
+- O PWA atual continua funcionando normalmente.
+- O Android nativo usa FCM Registration Token.
+- O navegador/PWA continua usando Firebase Installation ID (FID).
