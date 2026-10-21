@@ -51,6 +51,54 @@ jobs:
       - name: Sincronizar Capacitor
         run: npx cap sync android
 
+      - name: Gerar ícone oficial IDEAL Ofertas
+        run: |
+          python3 -m pip install --quiet pillow
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+
+          src = Path("../icon-maskable-512.png")
+          if not src.exists():
+              raise SystemExit("Ícone fonte não encontrado: " + str(src))
+
+          img = Image.open(src).convert("RGBA")
+
+          tamanhos = {
+              "mipmap-mdpi": 48,
+              "mipmap-hdpi": 72,
+              "mipmap-xhdpi": 96,
+              "mipmap-xxhdpi": 144,
+              "mipmap-xxxhdpi": 192,
+          }
+
+          base = Path("android/app/src/main/res")
+
+          for pasta, tamanho in tamanhos.items():
+              destino = base / pasta
+              destino.mkdir(parents=True, exist_ok=True)
+
+              icone = img.resize(
+                  (tamanho, tamanho),
+                  Image.Resampling.LANCZOS
+              )
+
+              icone.save(destino / "ic_launcher.png")
+              icone.save(destino / "ic_launcher_round.png")
+
+          # Remove o adaptive icon padrão do Capacitor para que
+          # o Android use diretamente o ícone oficial do IDEAL.
+          for nome in [
+              "ic_launcher.xml",
+              "ic_launcher_round.xml"
+          ]:
+              p = base / "mipmap-anydpi-v26" / nome
+              if p.exists():
+                  p.unlink()
+
+          print("Ícones IDEAL gerados com sucesso.")
+          PY
+
       - name: Preparar assinatura fixa de teste
         run: |
           base64 -d ideal-debug.keystore.b64 > ideal-debug.keystore
@@ -66,12 +114,12 @@ jobs:
 
           s = s.replace(
               "versionCode 1",
-              "versionCode 120"
+              "versionCode 121"
           )
 
           s = s.replace(
               'versionName "1.0"',
-              'versionName "1.2.0"'
+              'versionName "1.2.1"'
           )
 
           marker = "    buildTypes {"
