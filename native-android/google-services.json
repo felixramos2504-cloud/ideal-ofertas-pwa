@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "554998916130",
+    "project_id": "ideal-ofertas",
+    "storage_bucket": "ideal-ofertas.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:554998916130:android:18b267212813b53e89167b",
+        "android_client_info": {
+          "package_name": "br.com.idealsupermercados.ofertas"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCmsuLTNdQ2SbydlJEQGnMY_4ugYINO6D8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
