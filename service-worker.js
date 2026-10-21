@@ -1,9 +1,9 @@
 /* =========================================================
-   IDEAL SUPERMERCADOS — MASTER 12 · FASE 16.1 — PUSH DIRETO EM SEGUNDO PLANO
+   IDEAL SUPERMERCADOS — MASTER 12 · FASE 16.2 — PUSH ANDROID EM SEGUNDO PLANO
    FIREBASE MESSAGING + PWA — FID
    ========================================================= */
 
-const CACHE_NAME = 'ideal-ofertas-pwa-shell-v12-fase16-1-background';
+const CACHE_NAME = 'ideal-ofertas-pwa-shell-v12-fase16-2-background';
 
 const STATIC_FILES = [
   './',
@@ -169,20 +169,23 @@ self.addEventListener('push', event => {
         });
     }catch(_){}
 
-    const appVisivel =
+    /*
+     * FASE 16.2
+     * Em Android/PWA, visibilityState pode continuar como "visible"
+     * mesmo depois de o usuário sair para a tela inicial. Por isso,
+     * usamos WindowClient.focused para decidir se o app está realmente
+     * em primeiro plano.
+     */
+    const appEmFoco =
       clientes.some(
         client =>
           client &&
-          client.visibilityState === 'visible'
+          client.focused === true
       );
 
-    /*
-     * Com o app aberto, o Firebase/onMessage já mostra o aviso
-     * dentro do aplicativo. Evitamos uma notificação duplicada.
-     */
-    if(appVisivel){
+    if(appEmFoco){
       await logDiag(
-        'PUSH_APP_VISIVEL',
+        'PUSH_APP_EM_FOCO',
         {
           title: title,
           body: body
