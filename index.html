@@ -557,7 +557,7 @@ body.idealSplashAberta #iosHelp{
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js?v=12164', { scope: './', updateViaCache: 'none' })
+        navigator.serviceWorker.register('./service-worker.js?v=12165', { scope: './', updateViaCache: 'none' })
           .then(reg => console.log('IDEAL PWA ativo:', reg.scope))
           .catch(err => console.error('Erro Service Worker:', err));
       });
@@ -642,8 +642,8 @@ body.idealSplashAberta #iosHelp{
     const VAPID_PUBLIC_KEY =
       "BFqbS_rj0lihvZnpl3n6RBf58k1U5S8i96ziLKok2d19uuV8oo1hv6utVLz2KIUaJYKkdaYpHzuw0T1dVK4_2Mw";
 
-    const IDEAL_PUSH_VERSION = '12.16.4-FIREBASE-BG';
-    const IDEAL_SW_URL = './service-worker.js?v=12164';
+    const IDEAL_PUSH_VERSION = '12.16.5-AUTONOMO';
+    const IDEAL_SW_URL = './service-worker.js?v=12165';
 
     const btnPush =
       document.getElementById('btnPush');
@@ -1577,7 +1577,7 @@ body.idealSplashAberta #iosHelp{
       pushDiagPanel.textContent = 'Lendo diagnóstico Push...';
 
       const linhas = [];
-      linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.16.4 FIREBASE BG');
+      linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.16.5 AUTÔNOMO');
       linhas.push('Data: ' + new Date().toLocaleString('pt-BR'));
       linhas.push('Permissão: ' + (('Notification' in window) ? Notification.permission : 'não suportado'));
       linhas.push('Service Worker suportado: ' + ('serviceWorker' in navigator ? 'SIM' : 'NÃO'));
@@ -1737,13 +1737,10 @@ body.idealSplashAberta #iosHelp{
       messaging,
       payload => {
         console.log(
-          '[IDEAL Push] Mensagem em primeiro plano:',
+          '[IDEAL Push 12.16.5] Mensagem em primeiro plano:',
           payload
         );
-
-        mostrarToastPush(
-          payload
-        );
+        /* A exibição fica a cargo do Service Worker autônomo. */
       }
     );
 
@@ -1899,7 +1896,7 @@ body.idealSplashAberta #iosHelp{
  async function ler(){
    p.style.display='block';
    const linhas=[];
-   linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.16.4 FIREBASE BG');
+   linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.16.5 AUTÔNOMO');
    linhas.push('Data: '+new Date().toLocaleString('pt-BR'));
    linhas.push('Permissão: '+(('Notification' in window)?Notification.permission:'não suportado'));
    linhas.push('Identificador Firebase salvo no PWA: '+(localStorage.getItem('idealFcmToken')?'SIM':'NÃO'));
