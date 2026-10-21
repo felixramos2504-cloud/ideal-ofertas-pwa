@@ -1,9 +1,9 @@
 /* =========================================================
-   IDEAL SUPERMERCADOS — MASTER 12 · FASE 16.8 — RECUPERAÇÃO DA 16.5 FUNCIONAL
+   IDEAL SUPERMERCADOS — MASTER 12 · FASE 16.9 — TOKEN WEB + PUSH AUTÔNOMO
    FIREBASE MESSAGING + PWA — FID
    ========================================================= */
 
-const CACHE_NAME = 'ideal-ofertas-pwa-shell-v12-fase16-8-recuperacao-165';
+const CACHE_NAME = 'ideal-ofertas-pwa-shell-v12-fase16-9-token-web';
 
 const STATIC_FILES = [
   './',
