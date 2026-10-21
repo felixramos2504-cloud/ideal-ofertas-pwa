@@ -51,11 +51,57 @@ jobs:
       - name: Sincronizar Capacitor
         run: npx cap sync android
 
-      - name: Preparar assinatura estável de teste
+      - name: Preparar assinatura fixa de teste
         run: |
-          mkdir -p "$HOME/.android"
-          base64 -d ideal-debug.keystore.b64 > "$HOME/.android/debug.keystore"
-          keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey >/dev/null
+          base64 -d ideal-debug.keystore.b64 > ideal-debug.keystore
+          keytool -list -v -keystore ideal-debug.keystore -storepass android -alias androiddebugkey | grep "SHA256:"
+
+      - name: Forçar assinatura e versão no Gradle
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path("android/app/build.gradle")
+          s = p.read_text()
+
+          s = s.replace(
+              "versionCode 1",
+              "versionCode 120"
+          )
+
+          s = s.replace(
+              'versionName "1.0"',
+              'versionName "1.2.0"'
+          )
+
+          marker = "    buildTypes {"
+
+          signing = """    signingConfigs {
+              idealDebugFixed {
+                  storeFile file('../../ideal-debug.keystore')
+                  storePassword 'android'
+                  keyAlias 'androiddebugkey'
+                  keyPassword 'android'
+              }
+          }
+
+          """
+
+          if "idealDebugFixed" not in s:
+              s = s.replace(
+                  marker,
+                  signing + marker
+              )
+
+          s = s.replace(
+              "    buildTypes {\n",
+              "    buildTypes {\n        debug {\n            signingConfig signingConfigs.idealDebugFixed\n        }\n",
+              1
+          )
+
+          p.write_text(s)
+          print(p.read_text())
+          PY
 
       - name: Gerar APK debug
         run: |
