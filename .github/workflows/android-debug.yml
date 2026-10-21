@@ -99,6 +99,72 @@ jobs:
           print("Ícones IDEAL gerados com sucesso.")
           PY
 
+      - name: Configurar ícone das notificações Android
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          res = Path("android/app/src/main/res")
+          drawable = res / "drawable"
+          values = res / "values"
+          drawable.mkdir(parents=True, exist_ok=True)
+          values.mkdir(parents=True, exist_ok=True)
+
+          # Small icon monocromático exigido pelo Android.
+          (drawable / "ic_stat_ideal.xml").write_text("""<?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp"
+              android:height="24dp"
+              android:viewportWidth="24"
+              android:viewportHeight="24">
+              <path
+                  android:fillColor="#FFFFFFFF"
+                  android:pathData="M6,7h12l-1,13H7L6,7zM9,7V5a3,3 0,0 1,6 0v2h-2V5a1,1 0,0 0,-2 0v2H9zM10,10h4v7h-4z"/>
+          </vector>
+          """, encoding="utf-8")
+
+          colors = values / "colors.xml"
+          if colors.exists():
+              s = colors.read_text(encoding="utf-8")
+              if "ideal_notification_color" not in s:
+                  s = s.replace(
+                      "</resources>",
+                      '    <color name="ideal_notification_color">#D71920</color>\n</resources>'
+                  )
+                  colors.write_text(s, encoding="utf-8")
+          else:
+              colors.write_text(
+                  '<?xml version="1.0" encoding="utf-8"?>\n'
+                  '<resources>\n'
+                  '    <color name="ideal_notification_color">#D71920</color>\n'
+                  '</resources>\n',
+                  encoding="utf-8"
+              )
+
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          s = manifest.read_text(encoding="utf-8")
+
+          meta = """
+              <meta-data
+                  android:name="com.google.firebase.messaging.default_notification_icon"
+                  android:resource="@drawable/ic_stat_ideal" />
+              <meta-data
+                  android:name="com.google.firebase.messaging.default_notification_color"
+                  android:resource="@color/ideal_notification_color" />
+          """
+
+          if "default_notification_icon" not in s:
+              s = s.replace(
+                  "</application>",
+                  meta + "\n    </application>"
+              )
+
+          manifest.write_text(s, encoding="utf-8")
+          print("Ícone pequeno de notificação configurado.")
+          print(manifest.read_text(encoding="utf-8"))
+          PY
+
       - name: Preparar assinatura fixa de teste
         run: |
           base64 -d ideal-debug.keystore.b64 > ideal-debug.keystore
@@ -114,12 +180,12 @@ jobs:
 
           s = s.replace(
               "versionCode 1",
-              "versionCode 122"
+              "versionCode 123"
           )
 
           s = s.replace(
               'versionName "1.0"',
-              'versionName "1.2.2"'
+              'versionName "1.2.3"'
           )
 
           marker = "    buildTypes {"
