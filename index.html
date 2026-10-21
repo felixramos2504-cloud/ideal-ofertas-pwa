@@ -557,7 +557,7 @@ body.idealSplashAberta #iosHelp{
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./firebase-messaging-sw.js?v=12170', { scope: './', updateViaCache: 'none' })
+        navigator.serviceWorker.register('./firebase-messaging-sw.js?v=12171', { scope: './', updateViaCache: 'none' })
           .then(reg => console.log('IDEAL PWA ativo:', reg.scope))
           .catch(err => console.error('Erro Service Worker:', err));
       });
@@ -643,8 +643,8 @@ body.idealSplashAberta #iosHelp{
     const VAPID_PUBLIC_KEY =
       "BFqbS_rj0lihvZnpl3n6RBf58k1U5S8i96ziLKok2d19uuV8oo1hv6utVLz2KIUaJYKkdaYpHzuw0T1dVK4_2Mw";
 
-    const IDEAL_PUSH_VERSION = '12.17.0-FID-CLEAN';
-    const IDEAL_SW_URL = './firebase-messaging-sw.js?v=12170';
+    const IDEAL_PUSH_VERSION = '12.17.1-ATIVAR-AVISOS';
+    const IDEAL_SW_URL = './firebase-messaging-sw.js?v=12171';
 
     const btnPush =
       document.getElementById('btnPush');
@@ -1466,13 +1466,46 @@ body.idealSplashAberta #iosHelp{
         'click',
         async () => {
           btnPushConsentAtivar.disabled = true;
-          btnPushConsentDepois.disabled = true;
+          if(btnPushConsentDepois){
+            btnPushConsentDepois.disabled = true;
+          }
           btnPushConsentAtivar.textContent = 'Ativando...';
 
           try{
+            /*
+             * FASE 17.1 — a permissão precisa ser solicitada
+             * imediatamente dentro do toque do usuário.
+             * Não fazemos nenhum await antes de requestPermission().
+             */
+            let permissao =
+              ('Notification' in window)
+                ? Notification.permission
+                : 'denied';
+
+            if(permissao !== 'granted'){
+              permissao =
+                await Notification.requestPermission();
+            }
+
+            if(permissao !== 'granted'){
+              ocultarPushConsent1002();
+
+              mostrarToastPush({
+                data:{
+                  title:'Notificações não ativadas',
+                  body:
+                    permissao === 'denied'
+                      ? 'A permissão foi bloqueada no navegador.'
+                      : 'A permissão para notificações não foi concedida.'
+                }
+              });
+
+              return;
+            }
+
             const token =
               await obterTokenFcm({
-                pedirPermissao: true,
+                pedirPermissao: false,
                 mostrarSucesso: false
               });
 
@@ -1489,33 +1522,32 @@ body.idealSplashAberta #iosHelp{
                   body:'Você receberá atualizações importantes do seu pedido.'
                 }
               });
-            }else if(
-              Notification.permission === 'denied'
-            ){
-              ocultarPushConsent1002();
-
-              mostrarToastPush({
-                data:{
-                  title:'Notificações não ativadas',
-                  body:'A permissão foi bloqueada no navegador.'
-                }
-              });
             }
           }catch(err){
             console.warn(
-              '[IDEAL Push 10.0.2] Falha ao ativar:',
+              '[IDEAL Push 12.17.1] Falha ao ativar:',
               err
             );
+
+            const detalhe =
+              String(
+                err &&
+                (err.code || err.message) ||
+                err ||
+                'erro desconhecido'
+              );
 
             mostrarToastPush({
               data:{
                 title:'Não foi possível ativar agora',
-                body:'Tente novamente quando estiver com conexão estável.'
+                body:'Detalhe: ' + detalhe
               }
             });
           }finally{
             btnPushConsentAtivar.disabled = false;
-            btnPushConsentDepois.disabled = false;
+            if(btnPushConsentDepois){
+              btnPushConsentDepois.disabled = false;
+            }
             btnPushConsentAtivar.textContent = 'Ativar avisos';
           }
         }
@@ -1539,8 +1571,28 @@ body.idealSplashAberta #iosHelp{
         'Ativando...';
 
       try{
+        let permissao =
+          ('Notification' in window)
+            ? Notification.permission
+            : 'denied';
+
+        if(permissao !== 'granted'){
+          permissao =
+            await Notification.requestPermission();
+        }
+
+        if(permissao !== 'granted'){
+          mostrarMensagemPush(
+            permissao === 'denied'
+              ? 'As notificações estão bloqueadas nas permissões do navegador.'
+              : 'A permissão para notificações não foi concedida.',
+            9000
+          );
+          return;
+        }
+
         await obterTokenFcm({
-          pedirPermissao: true,
+          pedirPermissao: false,
           mostrarSucesso: true
         });
 
@@ -1619,7 +1671,7 @@ body.idealSplashAberta #iosHelp{
       pushDiagPanel.textContent = 'Lendo diagnóstico Push...';
 
       const linhas = [];
-      linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.17.0 FID CLEAN');
+      linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.17.1 ATIVAR AVISOS');
       linhas.push('Data: ' + new Date().toLocaleString('pt-BR'));
       linhas.push('Permissão: ' + (('Notification' in window) ? Notification.permission : 'não suportado'));
       linhas.push('Service Worker suportado: ' + ('serviceWorker' in navigator ? 'SIM' : 'NÃO'));
@@ -1941,7 +1993,7 @@ body.idealSplashAberta #iosHelp{
  async function ler(){
    p.style.display='block';
    const linhas=[];
-   linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.17.0 FID CLEAN');
+   linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.17.1 ATIVAR AVISOS');
    linhas.push('Data: '+new Date().toLocaleString('pt-BR'));
    linhas.push('Permissão: '+(('Notification' in window)?Notification.permission:'não suportado'));
    linhas.push('Identificador Firebase salvo no PWA: '+(localStorage.getItem('idealFcmToken')?'SIM':'NÃO'));
