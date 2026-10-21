@@ -51,6 +51,12 @@ jobs:
       - name: Sincronizar Capacitor
         run: npx cap sync android
 
+      - name: Preparar assinatura estável de teste
+        run: |
+          mkdir -p "$HOME/.android"
+          base64 -d ideal-debug.keystore.b64 > "$HOME/.android/debug.keystore"
+          keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey >/dev/null
+
       - name: Gerar APK debug
         run: |
           cd android
