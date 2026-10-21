@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 
-const NATIVE_VERSION = '1.1-DIAG-PUSH';
+const NATIVE_VERSION = '1.2-DIRECT-BRIDGE';
 
 const APP_ORIGIN =
   'https://felixramos2504-cloud.github.io';
@@ -17,6 +17,20 @@ const statusEl =
 
 let tokenNativo =
   localStorage.getItem('idealNativeFcmToken') || '';
+
+let ponteGoogleWindow = null;
+let ponteGoogleOrigin = '';
+
+let contextoCliente = {
+  telefone:
+    localStorage.getItem(
+      'idealNativeClienteTelefone'
+    ) || '',
+  idPedido:
+    localStorage.getItem(
+      'idealNativeUltimoPedido'
+    ) || ''
+};
 
 const diag = {
   versao: NATIVE_VERSION,
@@ -141,6 +155,88 @@ function mostrarStatus(texto, tipo = '') {
     window.setTimeout(() => {
       statusEl.classList.add('oculto');
     }, tipo === 'erro' ? 9000 : 4500);
+}
+
+function origemGoogleValida(origin) {
+  try {
+    const host =
+      new URL(origin).hostname;
+
+    return (
+      host === 'script.google.com' ||
+      host === 'script.googleusercontent.com' ||
+      host.endsWith('.googleusercontent.com')
+    );
+  } catch (_) {
+    return false;
+  }
+}
+
+function enviarTokenDiretoAppsScript() {
+  if (
+    !tokenNativo ||
+    !ponteGoogleWindow ||
+    !ponteGoogleOrigin
+  ) {
+    return false;
+  }
+
+  try {
+    ponteGoogleWindow.postMessage(
+      {
+        type:
+          'IDEAL_PUSH_REGISTRAR_TOKEN',
+
+        payload: {
+          idDispositivo:
+            'native-' + obterIdNativo(),
+
+          tokenFcm:
+            tokenNativo,
+
+          plataforma:
+            'ANDROID_NATIVE',
+
+          userAgent:
+            navigator.userAgent || '',
+
+          origem:
+            'IDEAL_OFERTAS_ANDROID_NATIVE',
+
+          telefone:
+            String(
+              contextoCliente.telefone || ''
+            ).replace(/\D/g, ''),
+
+          idPedido:
+            String(
+              contextoCliente.idPedido || ''
+            ).trim()
+        }
+      },
+      ponteGoogleOrigin
+    );
+
+    setDiag(
+      'ponteAppsScript',
+      'DIRETA PRONTA · token enviado'
+    );
+
+    return true;
+  } catch (err) {
+    setDiag(
+      'ponteAppsScript',
+      'ERRO DIRETO'
+    );
+
+    setDiag(
+      'ultimoErro',
+      'Ponte direta: ' +
+      String(err?.message || err)
+    );
+
+    return false;
+  }
 }
 
 function obterIdNativo() {
@@ -286,12 +382,124 @@ frame.addEventListener(
 window.addEventListener(
   'message',
   event => {
-    if (event.origin !== APP_ORIGIN) {
+    const msg =
+      event.data || {};
+
+    /*
+     * Apps Script pode anunciar a ponte para window.top.
+     * No APK, window.top é o shell nativo. Capturamos aqui.
+     */
+    if(origemGoogleValida(event.origin)) {
+      if(
+        msg.type ===
+        'IDEAL_PUSH_BRIDGE_READY'
+      ) {
+        ponteGoogleWindow =
+          event.source;
+
+        ponteGoogleOrigin =
+          event.origin;
+
+        setDiag(
+          'ponteAppsScript',
+          'DIRETA PRONTA'
+        );
+
+        enviarTokenDiretoAppsScript();
+
+        window.setTimeout(
+          enviarTokenDiretoAppsScript,
+          800
+        );
+
+        return;
+      }
+
+      if(
+        msg.type ===
+        'IDEAL_PUSH_TOKEN_RESULTADO'
+      ) {
+        if(msg.ok) {
+          setDiag(
+            'backend',
+            'CONFIRMADO'
+          );
+
+          setDiag(
+            'ponteAppsScript',
+            'DIRETA PRONTA'
+          );
+
+          mostrarStatus(
+            '✅ Push Android conectado ao backend.',
+            'ok'
+          );
+        } else {
+          setDiag(
+            'backend',
+            'ERRO'
+          );
+
+          setDiag(
+            'ultimoErro',
+            String(
+              msg.erro ||
+              'Apps Script não confirmou o token.'
+            )
+          );
+        }
+
+        return;
+      }
+
+      if(
+        msg.type ===
+        'IDEAL_PUSH_CLIENTE_CONTEXT'
+      ) {
+        const telefone =
+          String(
+            msg.telefone || ''
+          ).replace(/\D/g, '');
+
+        const idPedido =
+          String(
+            msg.idPedido || ''
+          ).trim();
+
+        if(telefone) {
+          contextoCliente.telefone =
+            telefone;
+
+          localStorage.setItem(
+            'idealNativeClienteTelefone',
+            telefone
+          );
+        }
+
+        if(idPedido) {
+          contextoCliente.idPedido =
+            idPedido;
+
+          localStorage.setItem(
+            'idealNativeUltimoPedido',
+            idPedido
+          );
+        }
+
+        enviarTokenDiretoAppsScript();
+
+        return;
+      }
+
       return;
     }
 
-    const msg =
-      event.data || {};
+    /*
+     * Mensagens da página GitHub carregada no iframe.
+     */
+    if (event.origin !== APP_ORIGIN) {
+      return;
+    }
 
     if (
       msg.type ===
@@ -302,12 +510,21 @@ window.addEventListener(
         'OK'
       );
 
-      setDiag(
-        'ponteAppsScript',
-        msg.pontePronta
-          ? 'PRONTA'
-          : 'AINDA NÃO PRONTA'
-      );
+      /*
+       * Este campo agora mostra o estado da ponte antiga apenas
+       * como diagnóstico; a ponte direta não depende dele.
+       */
+      if(
+        diag.ponteAppsScript ===
+        'desconhecida'
+      ) {
+        setDiag(
+          'ponteAppsScript',
+          msg.pontePronta
+            ? 'PWA PRONTA'
+            : 'aguardando ponte direta'
+        );
+      }
 
       return;
     }
@@ -329,16 +546,50 @@ window.addEventListener(
 
     if (
       msg.type ===
+      'IDEAL_NATIVE_CLIENT_CONTEXT'
+    ) {
+      const telefone =
+        String(
+          msg.telefone || ''
+        ).replace(/\D/g, '');
+
+      const idPedido =
+        String(
+          msg.idPedido || ''
+        ).trim();
+
+      if(telefone) {
+        contextoCliente.telefone =
+          telefone;
+
+        localStorage.setItem(
+          'idealNativeClienteTelefone',
+          telefone
+        );
+      }
+
+      if(idPedido) {
+        contextoCliente.idPedido =
+          idPedido;
+
+        localStorage.setItem(
+          'idealNativeUltimoPedido',
+          idPedido
+        );
+      }
+
+      enviarTokenDiretoAppsScript();
+
+      return;
+    }
+
+    if (
+      msg.type ===
       'IDEAL_NATIVE_PUSH_BACKEND_OK'
     ) {
       setDiag(
         'backend',
         'CONFIRMADO'
-      );
-
-      setDiag(
-        'ponteAppsScript',
-        'PRONTA'
       );
 
       mostrarStatus(
