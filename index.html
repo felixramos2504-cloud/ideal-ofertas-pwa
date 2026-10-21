@@ -1221,6 +1221,23 @@ body.idealSplashAberta #iosHelp{
             )
         };
 
+        const contextoNativo =
+          obterUltimoPedidoPush();
+
+        try{
+          window.parent.postMessage(
+            {
+              type:
+                'IDEAL_NATIVE_CLIENT_CONTEXT',
+              telefone:
+                contextoNativo.telefone || '',
+              idPedido:
+                contextoNativo.idPedido || ''
+            },
+            '*'
+          );
+        }catch(_){}
+
         localStorage.setItem(
           'idealNativeFcmTokenBridge',
           token
@@ -1397,10 +1414,29 @@ body.idealSplashAberta #iosHelp{
 
         if(mensagem.type === 'IDEAL_PUSH_CLIENTE_CONTEXT'){
           const tel = String(mensagem.telefone || '').replace(/\D/g, '').slice(-11);
+          const pedidoContexto = String(mensagem.idPedido || '').trim();
+
           if(tel.length >= 10){
             localStorage.setItem('idealPushClienteTelefone', tel);
+
+            if(window.IDEAL_NATIVE_ANDROID){
+              try{
+                window.parent.postMessage(
+                  {
+                    type:
+                      'IDEAL_NATIVE_CLIENT_CONTEXT',
+                    telefone:
+                      tel,
+                    idPedido:
+                      pedidoContexto
+                  },
+                  '*'
+                );
+              }catch(_){}
+            }
+
             const tokenAtual = localStorage.getItem('idealFcmToken') || '';
-            if(tokenAtual){
+            if(tokenAtual && !window.IDEAL_NATIVE_ANDROID){
               window.setTimeout(() => enviarTokenAoAppsScript(tokenAtual), 100);
             }
           }
