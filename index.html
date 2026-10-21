@@ -643,7 +643,7 @@ body.idealSplashAberta #iosHelp{
     const VAPID_PUBLIC_KEY =
       "BFqbS_rj0lihvZnpl3n6RBf58k1U5S8i96ziLKok2d19uuV8oo1hv6utVLz2KIUaJYKkdaYpHzuw0T1dVK4_2Mw";
 
-    const IDEAL_PUSH_VERSION = '12.17.2-DIAG-SUBSCRIPTION';
+    const IDEAL_PUSH_VERSION = '12.17.3-REPARO-CANAL';
     const IDEAL_SW_URL = './firebase-messaging-sw.js?v=12171';
 
     const btnPush =
@@ -1671,7 +1671,7 @@ body.idealSplashAberta #iosHelp{
       pushDiagPanel.textContent = 'Lendo diagnóstico Push...';
 
       const linhas = [];
-      linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.17.2 SUBSCRIPTION');
+      linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.17.3 REPARO CANAL');
       linhas.push('Data: ' + new Date().toLocaleString('pt-BR'));
       linhas.push('Permissão: ' + (('Notification' in window) ? Notification.permission : 'não suportado'));
       linhas.push('Service Worker suportado: ' + ('serviceWorker' in navigator ? 'SIM' : 'NÃO'));
@@ -1917,6 +1917,141 @@ body.idealSplashAberta #iosHelp{
     window.addEventListener('pageshow', function(){
       window.setTimeout(atualizarRegistroPush1215SeNecessario, 700);
     });
+
+    /*
+     * FASE 17.3 — REPARO CONTROLADO DO CANAL PUSH
+     * Remove somente o vínculo FCM/FID e a PushSubscription atual
+     * deste navegador, recriando ambos no mesmo Service Worker.
+     */
+    window.idealRepararCanalPush173 = async function(){
+      if(
+        !('Notification' in window) ||
+        Notification.permission !== 'granted'
+      ){
+        throw new Error(
+          'A permissão de notificações precisa estar liberada.'
+        );
+      }
+
+      if(!('serviceWorker' in navigator)){
+        throw new Error(
+          'Service Worker não é suportado neste navegador.'
+        );
+      }
+
+      const reg =
+        await navigator.serviceWorker.register(
+          IDEAL_SW_URL,
+          {
+            scope: './',
+            updateViaCache: 'none'
+          }
+        );
+
+      try{
+        await reg.update();
+      }catch(_){}
+
+      const pronto =
+        reg.active
+          ? reg
+          : await navigator.serviceWorker.ready;
+
+      /*
+       * 1) remove o registro FID no FCM;
+       * 2) remove a assinatura Push antiga do Chrome;
+       * 3) limpa apenas chaves locais de Push;
+       * 4) registra novamente e envia o novo FID ao backend.
+       */
+      try{
+        await unregisterMessaging(
+          messaging
+        );
+      }catch(err){
+        console.warn(
+          '[IDEAL Push 12.17.3] unregister anterior:',
+          err
+        );
+      }
+
+      try{
+        const sub =
+          await pronto.pushManager.getSubscription();
+
+        if(sub){
+          await sub.unsubscribe();
+        }
+      }catch(err){
+        console.warn(
+          '[IDEAL Push 12.17.3] unsubscribe anterior:',
+          err
+        );
+      }
+
+      [
+        'idealFcmToken',
+        'idealFcmTokenAtualizadoEm',
+        'idealPushTokenSalvoNaPlanilha',
+        'idealPushTokenSalvoEm',
+        IDEAL_PUSH_RECOVERY_KEY,
+        IDEAL_PUSH_REFRESH_KEY,
+        IDEAL_PUSH_SW_BIND_KEY
+      ].forEach(chave => {
+        try{
+          localStorage.removeItem(chave);
+        }catch(_){}
+      });
+
+      ultimoFidRegistrado = '';
+      ultimoTokenEnviado = '';
+      tokenConfirmadoBackend = '';
+
+      /*
+       * Pequena pausa para o Chrome concluir a remoção
+       * antes de criar a nova assinatura.
+       */
+      await new Promise(resolve =>
+        window.setTimeout(resolve, 700)
+      );
+
+      const novoFid =
+        await obterTokenFcm({
+          pedirPermissao: false,
+          mostrarSucesso: false
+        });
+
+      if(!novoFid){
+        throw new Error(
+          'O Firebase não retornou um novo identificador.'
+        );
+      }
+
+      /*
+       * Aguarda a ponte do Apps Script confirmar a gravação.
+       */
+      const limite = Date.now() + 12000;
+
+      while(
+        Date.now() < limite &&
+        localStorage.getItem(
+          'idealPushTokenSalvoNaPlanilha'
+        ) !== novoFid
+      ){
+        await new Promise(resolve =>
+          window.setTimeout(resolve, 500)
+        );
+      }
+
+      return {
+        ok: true,
+        fid:
+          novoFid.slice(-10),
+        backend:
+          localStorage.getItem(
+            'idealPushTokenSalvoNaPlanilha'
+          ) === novoFid
+      };
+    };
   </script>
 
 
@@ -1991,6 +2126,8 @@ body.idealSplashAberta #iosHelp{
 <!-- FASE 16 · DIAGNÓSTICO TEMPORÁRIO DO PUSH -->
 <button id="btnPushDiagTemp16" type="button"
  style="position:fixed!important;right:14px!important;bottom:18px!important;z-index:2147483647!important;display:block!important;visibility:visible!important;opacity:1!important;border:0!important;border-radius:999px!important;padding:11px 15px!important;background:#202124!important;color:#fff!important;box-shadow:0 8px 26px rgba(0,0,0,.3)!important;font-weight:900!important;cursor:pointer!important;">🔎 Diagnóstico Push</button>
+<button id="btnPushRepair173" type="button"
+ style="position:fixed!important;left:14px!important;bottom:18px!important;z-index:2147483647!important;display:block!important;visibility:visible!important;opacity:1!important;border:0!important;border-radius:999px!important;padding:11px 15px!important;background:#d71920!important;color:#fff!important;box-shadow:0 8px 26px rgba(0,0,0,.3)!important;font-weight:900!important;cursor:pointer!important;">🛠 Reparar Push</button>
 <div id="pushDiagTemp16"
  style="display:none;position:fixed!important;right:14px!important;bottom:70px!important;z-index:2147483647!important;width:min(92vw,620px)!important;max-height:62vh!important;overflow:auto!important;background:#111!important;color:#eee!important;border-radius:12px!important;padding:12px!important;box-shadow:0 10px 36px rgba(0,0,0,.4)!important;font:12px/1.45 Consolas,monospace!important;white-space:pre-wrap!important;word-break:break-word!important;"></div>
 <script>
@@ -2008,7 +2145,7 @@ body.idealSplashAberta #iosHelp{
  async function ler(){
    p.style.display='block';
    const linhas=[];
-   linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.17.2 SUBSCRIPTION');
+   linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.17.3 REPARO CANAL');
    linhas.push('Data: '+new Date().toLocaleString('pt-BR'));
    linhas.push('Permissão: '+(('Notification' in window)?Notification.permission:'não suportado'));
    linhas.push('Identificador Firebase salvo no PWA: '+(localStorage.getItem('idealFcmToken')?'SIM':'NÃO'));
@@ -2045,6 +2182,42 @@ body.idealSplashAberta #iosHelp{
    p.textContent=linhas.join('\n');
  }
  b.addEventListener('click',()=>{if(p.style.display==='block'){p.style.display='none';return;}ler();});
+
+ const r=document.getElementById('btnPushRepair173');
+ if(r){
+   r.addEventListener('click',async()=>{
+     if(typeof window.idealRepararCanalPush173!=='function'){
+       alert('O reparo Push ainda não foi carregado. Feche e abra o app novamente.');
+       return;
+     }
+
+     if(!confirm('Recriar somente o canal de notificações deste aparelho?')){
+       return;
+     }
+
+     const textoOriginal=r.textContent;
+     r.disabled=true;
+     r.textContent='Reparando...';
+
+     try{
+       const resp=await window.idealRepararCanalPush173();
+       alert(
+         resp&&resp.backend
+           ? 'Canal Push recriado e confirmado no backend.'
+           : 'Canal Push recriado. Aguarde alguns segundos e abra o diagnóstico.'
+       );
+       await ler();
+     }catch(err){
+       alert(
+         'Falha ao reparar Push: '+
+         String(err&&(err.message||err)||err)
+       );
+     }finally{
+       r.disabled=false;
+       r.textContent=textoOriginal;
+     }
+   });
+ }
 })();
 </script>
 
