@@ -545,6 +545,15 @@ body.idealSplashAberta #iosHelp{
   </div>
 
   <script>
+    const IDEAL_NATIVE_ANDROID =
+      new URLSearchParams(
+        window.location.search
+      ).get('native') === 'android' &&
+      window.parent !== window;
+
+    window.IDEAL_NATIVE_ANDROID =
+      IDEAL_NATIVE_ANDROID;
+
     const frame = document.getElementById('appFrame');
     const loading = document.getElementById('loading');
 
@@ -555,7 +564,7 @@ body.idealSplashAberta #iosHelp{
       }, 500);
     });
 
-    if ('serviceWorker' in navigator) {
+    if (!IDEAL_NATIVE_ANDROID && 'serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./firebase-messaging-sw.js?v=12176', { scope: './', updateViaCache: 'none' })
           .then(reg => console.log('IDEAL PWA ativo:', reg.scope))
@@ -569,11 +578,41 @@ body.idealSplashAberta #iosHelp{
     const btnClose = document.getElementById('btnClose');
     const iosHelp = document.getElementById('iosHelp');
 
+    if(IDEAL_NATIVE_ANDROID){
+      bar.style.display = 'none';
+
+      window.addEventListener('DOMContentLoaded', () => {
+        [
+          'pushConsent1002',
+          'btnPush',
+          'btnPushLocalTest',
+          'btnPushDiag',
+          'btnPushDiagTemp16',
+          'btnPushRepair173',
+          'installBar',
+          'iosHelp'
+        ].forEach(id => {
+          const el = document.getElementById(id);
+          if(el){
+            el.style.setProperty(
+              'display',
+              'none',
+              'important'
+            );
+          }
+        });
+      });
+    }
+
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
       window.navigator.standalone === true;
 
     window.addEventListener('beforeinstallprompt', event => {
+      if(IDEAL_NATIVE_ANDROID){
+        return;
+      }
+
       event.preventDefault();
       deferredPrompt = event;
 
@@ -643,7 +682,7 @@ body.idealSplashAberta #iosHelp{
     const VAPID_PUBLIC_KEY =
       "BFqbS_rj0lihvZnpl3n6RBf58k1U5S8i96ziLKok2d19uuV8oo1hv6utVLz2KIUaJYKkdaYpHzuw0T1dVK4_2Mw";
 
-    const IDEAL_PUSH_VERSION = '12.17.6-FOCUS-ROUTER';
+    const IDEAL_PUSH_VERSION = '12.18.0-NATIVE-BRIDGE';
     const IDEAL_SW_URL = './firebase-messaging-sw.js?v=12176';
 
     const btnPush =
@@ -1032,6 +1071,159 @@ body.idealSplashAberta #iosHelp{
       }
     }
 
+    let idealNativePushPendente =
+      localStorage.getItem(
+        'idealNativeFcmTokenBridge'
+      ) || '';
+
+    let idealNativeMetaPendente = null;
+
+    function enviarTokenNativoAoAppsScript(){
+      const token =
+        String(
+          idealNativePushPendente ||
+          localStorage.getItem(
+            'idealNativeFcmTokenBridge'
+          ) ||
+          ''
+        ).trim();
+
+      if(
+        !window.IDEAL_NATIVE_ANDROID ||
+        !token ||
+        !ponteAppsScriptPronta ||
+        !ponteAppsScriptWindow ||
+        !ponteAppsScriptOrigin
+      ){
+        return false;
+      }
+
+      const meta =
+        idealNativeMetaPendente || {};
+
+      const contexto =
+        obterUltimoPedidoPush();
+
+      ponteAppsScriptWindow.postMessage(
+        {
+          type:
+            'IDEAL_PUSH_REGISTRAR_TOKEN',
+
+          payload: {
+            idDispositivo:
+              String(
+                meta.idDispositivo ||
+                (
+                  'native-' +
+                  obterIdDispositivo()
+                )
+              ),
+
+            tokenFcm:
+              token,
+
+            plataforma:
+              'ANDROID_NATIVE',
+
+            userAgent:
+              String(
+                meta.userAgent ||
+                navigator.userAgent ||
+                ''
+              ),
+
+            origem:
+              'IDEAL_OFERTAS_ANDROID_NATIVE',
+
+            telefone:
+              contexto.telefone,
+
+            idPedido:
+              contexto.idPedido
+          }
+        },
+        ponteAppsScriptOrigin
+      );
+
+      console.log(
+        '[IDEAL Android] Token nativo enviado para a ponte Apps Script.'
+      );
+
+      return true;
+    }
+
+    /*
+     * Recebe o FCM Registration Token do shell Capacitor.
+     * Esse token é separado do FID usado pelo PWA/Chrome.
+     */
+    window.addEventListener(
+      'message',
+      event => {
+        if(
+          !window.IDEAL_NATIVE_ANDROID ||
+          event.source !== window.parent
+        ){
+          return;
+        }
+
+        const mensagem =
+          event.data || {};
+
+        if(
+          mensagem.type !==
+          'IDEAL_NATIVE_PUSH_TOKEN'
+        ){
+          return;
+        }
+
+        const payload =
+          mensagem.payload || {};
+
+        const token =
+          String(
+            payload.tokenFcm || ''
+          ).trim();
+
+        if(!token){
+          return;
+        }
+
+        idealNativePushPendente =
+          token;
+
+        idealNativeMetaPendente = {
+          idDispositivo:
+            String(
+              payload.idDispositivo || ''
+            ),
+          userAgent:
+            String(
+              payload.userAgent || ''
+            )
+        };
+
+        localStorage.setItem(
+          'idealNativeFcmTokenBridge',
+          token
+        );
+
+        localStorage.setItem(
+          'idealNativePushRecebidoEm',
+          new Date().toISOString()
+        );
+
+        const tentativas =
+          [0, 500, 1500, 3500, 7000];
+
+        tentativas.forEach(tempo => {
+          window.setTimeout(
+            enviarTokenNativoAoAppsScript,
+            tempo
+          );
+        });
+      }
+    );
+
     function enviarTokenAoAppsScript(token){
       if(
         !token ||
@@ -1151,7 +1343,7 @@ body.idealSplashAberta #iosHelp{
               'idealFcmToken'
             ) || '';
 
-          if(token){
+          if(token && !window.IDEAL_NATIVE_ANDROID){
             window.setTimeout(
               () => {
                 enviarTokenAoAppsScript(
@@ -1159,6 +1351,13 @@ body.idealSplashAberta #iosHelp{
                 );
               },
               150
+            );
+          }
+
+          if(window.IDEAL_NATIVE_ANDROID){
+            window.setTimeout(
+              enviarTokenNativoAoAppsScript,
+              180
             );
           }
 
@@ -1185,6 +1384,39 @@ body.idealSplashAberta #iosHelp{
         }
 
         if(mensagem.ok){
+          if(
+            window.IDEAL_NATIVE_ANDROID &&
+            idealNativePushPendente
+          ){
+            localStorage.setItem(
+              'idealNativePushTokenSalvoNaPlanilha',
+              idealNativePushPendente
+            );
+
+            localStorage.setItem(
+              'idealNativePushTokenSalvoEm',
+              new Date().toISOString()
+            );
+
+            try{
+              window.parent.postMessage(
+                {
+                  type:
+                    'IDEAL_NATIVE_PUSH_BACKEND_OK',
+                  tokenSuffix:
+                    idealNativePushPendente.slice(-10)
+                },
+                '*'
+              );
+            }catch(_){}
+
+            console.log(
+              '[IDEAL Android] Token nativo confirmado pelo backend.'
+            );
+
+            return;
+          }
+
           const token =
             localStorage.getItem(
               'idealFcmToken'
@@ -1671,7 +1903,7 @@ body.idealSplashAberta #iosHelp{
       pushDiagPanel.textContent = 'Lendo diagnóstico Push...';
 
       const linhas = [];
-      linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.17.6 FOCUS ROUTER');
+      linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.18.0 NATIVE BRIDGE');
       linhas.push('Data: ' + new Date().toLocaleString('pt-BR'));
       linhas.push('Permissão: ' + (('Notification' in window) ? Notification.permission : 'não suportado'));
       linhas.push('Service Worker suportado: ' + ('serviceWorker' in navigator ? 'SIM' : 'NÃO'));
@@ -2037,6 +2269,7 @@ body.idealSplashAberta #iosHelp{
      * o token FCM ao abrir e envia para a planilha sem pedir nada.
      */
     if(
+      !window.IDEAL_NATIVE_ANDROID &&
       'Notification' in window &&
       Notification.permission ===
       'granted'
@@ -2058,13 +2291,18 @@ body.idealSplashAberta #iosHelp{
 
     /* Ao voltar ao PWA, renova/reenvia o vínculo quando necessário. */
     document.addEventListener('visibilitychange', function(){
-      if(!document.hidden){
+      if(!window.IDEAL_NATIVE_ANDROID && !document.hidden){
         window.setTimeout(atualizarRegistroPush1215SeNecessario, 350);
       }
     });
 
     window.addEventListener('pageshow', function(){
-      window.setTimeout(atualizarRegistroPush1215SeNecessario, 700);
+      if(!window.IDEAL_NATIVE_ANDROID){
+        window.setTimeout(
+          atualizarRegistroPush1215SeNecessario,
+          700
+        );
+      }
     });
 
     /*
@@ -2294,7 +2532,7 @@ body.idealSplashAberta #iosHelp{
  async function ler(){
    p.style.display='block';
    const linhas=[];
-   linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.17.6 FOCUS ROUTER');
+   linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.18.0 NATIVE BRIDGE');
    linhas.push('Data: '+new Date().toLocaleString('pt-BR'));
    linhas.push('Permissão: '+(('Notification' in window)?Notification.permission:'não suportado'));
    linhas.push('Identificador Firebase salvo no PWA: '+(localStorage.getItem('idealFcmToken')?'SIM':'NÃO'));
