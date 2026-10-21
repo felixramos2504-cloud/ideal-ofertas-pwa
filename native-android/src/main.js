@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 
-const NATIVE_VERSION = '1.2-DIRECT-BRIDGE';
+const NATIVE_VERSION = '1.2.2-CLIENTE';
 
 const APP_ORIGIN =
   'https://felixramos2504-cloud.github.io';
@@ -12,8 +12,7 @@ const APP_URL =
 const frame =
   document.getElementById('idealFrame');
 
-const statusEl =
-  document.getElementById('nativeStatus');
+const statusEl = null;
 
 let tokenNativo =
   localStorage.getItem('idealNativeFcmToken') || '';
@@ -621,7 +620,6 @@ window.addEventListener(
 );
 
 async function prepararPushNativo() {
-  criarDiagUI();
 
   if (
     !Capacitor.isNativePlatform() ||
