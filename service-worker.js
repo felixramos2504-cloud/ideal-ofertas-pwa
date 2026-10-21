@@ -1,9 +1,9 @@
 /* =========================================================
-   IDEAL SUPERMERCADOS — MASTER 12 · FASE 16.4 — FIREBASE BACKGROUND OFICIAL
+   IDEAL SUPERMERCADOS — MASTER 12 · FASE 16.5 — PUSH AUTÔNOMO
    FIREBASE MESSAGING + PWA — FID
    ========================================================= */
 
-const CACHE_NAME = 'ideal-ofertas-pwa-shell-v12-fase16-4-firebase-background';
+const CACHE_NAME = 'ideal-ofertas-pwa-shell-v12-fase16-5-push-autonomo';
 
 const STATIC_FILES = [
   './',
@@ -121,135 +121,117 @@ self.addEventListener('notificationclick', event => {
   );
 });
 
-/* Firebase Messaging compat no Service Worker. */
-importScripts(
-  'https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js'
-);
-importScripts(
-  'https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging-compat.js'
-);
+/* =========================================================
+   FASE 16.5 — PUSH AUTÔNOMO DO IDEAL
+   O Service Worker exibe a notificação diretamente e não usa
+   a heurística de visibilidade do Firebase Messaging.
+   ========================================================= */
 
-firebase.initializeApp({
-  apiKey: "AIzaSyCxNq9yO7JhXn9PHqgAMdls5Cb89yq2tv0",
-  authDomain: "ideal-ofertas.firebaseapp.com",
-  projectId: "ideal-ofertas",
-  storageBucket: "ideal-ofertas.firebasestorage.app",
-  messagingSenderId: "554998916130",
-  appId: "1:554998916130:web:ce65e917617d036f89167b"
-});
+self.addEventListener('push', event => {
+  event.waitUntil((async () => {
+    let payload = {};
+    let bruto = '';
 
-const messaging = firebase.messaging();
-
-/*
- * Toda mensagem recebida em segundo plano passa por aqui.
- * O handler cria a notificação do sistema explicitamente.
- */
-messaging.onBackgroundMessage(payload => {
-  const notification =
-    (payload && payload.notification) || {};
-
-  const data =
-    (payload && payload.data) || {};
-
-  const fcmOptions =
-    (payload && payload.fcmOptions) || {};
-
-  const resumo = {
-    notification: notification,
-    data: data,
-    fcmOptions: fcmOptions
-  };
-
-  console.log(
-    '[IDEAL Push 12.16.4] Background Firebase:',
-    payload
-  );
-
-  return (async () => {
-    await logDiag(
-      'FCM_BACKGROUND_RECEBIDO',
-      resumo
-    );
-
-    /*
-     * FASE 16.4 — PADRÃO OFICIAL FIREBASE
-     *
-     * Se existir payload.notification, o próprio FCM/Chrome
-     * exibe a notificação do sistema em segundo plano.
-     * Não chamamos showNotification() novamente para evitar duplicidade.
-     */
-    if(
-      notification &&
-      (
-        notification.title ||
-        notification.body
-      )
-    ){
-      await logDiag(
-        'FCM_NOTIFICATION_AUTOMATICA',
-        {
-          title:
-            notification.title ||
-            data.title ||
-            '',
-          body:
-            notification.body ||
-            data.body ||
-            ''
+    try{
+      if(event.data){
+        try{
+          payload = event.data.json() || {};
+        }catch(_){
+          bruto = event.data.text() || '';
+          try{
+            payload = JSON.parse(bruto);
+          }catch(__){
+            payload = {};
+          }
         }
+      }
+    }catch(err){
+      await logDiag(
+        'PUSH_PARSE_ERRO',
+        { mensagem: String(err && (err.message || err)) }
       );
-
-      return;
     }
 
-    /*
-     * Fallback apenas para mensagens DATA-ONLY.
-     */
+    await logDiag(
+      'PUSH_RAW_RECEBIDO',
+      payload && Object.keys(payload).length
+        ? payload
+        : (bruto || 'evento push sem payload')
+    );
+
+    const notification =
+      (payload && payload.notification) || {};
+
+    const data =
+      (payload && payload.data) || {};
+
+    const fcmOptions =
+      (payload && payload.fcmOptions) || {};
+
     const title =
+      notification.title ||
       data.title ||
       'IDEAL Supermercados';
 
-    const options = {
-      body:
-        data.body ||
-        'Você recebeu uma nova atualização.',
-      icon:
-        data.icon ||
-        './icon-192.png',
-      badge:
-        data.badge ||
-        './icon-192.png',
-      tag:
-        data.tag ||
-        'ideal-ofertas',
-      renotify: true,
-      data: {
-        url:
-          fcmOptions.link ||
-          data.url ||
-          './'
-      }
-    };
+    const body =
+      notification.body ||
+      data.body ||
+      'Você recebeu uma nova atualização.';
+
+    const icon =
+      notification.icon ||
+      data.icon ||
+      './icon-192.png';
+
+    const badge =
+      notification.badge ||
+      data.badge ||
+      './icon-192.png';
+
+    const tag =
+      notification.tag ||
+      data.tag ||
+      (
+        payload && payload.fcmMessageId
+          ? 'ideal-' + payload.fcmMessageId
+          : 'ideal-ofertas'
+      );
+
+    const url =
+      (
+        fcmOptions &&
+        fcmOptions.link
+      ) ||
+      data.url ||
+      './';
 
     try{
       await self.registration.showNotification(
         title,
-        options
+        {
+          body: body,
+          icon: icon,
+          badge: badge,
+          tag: tag,
+          renotify: true,
+          requireInteraction: false,
+          data: { url: url }
+        }
       );
 
       await logDiag(
         'SHOW_NOTIFICATION_OK',
         {
-          origem: 'FCM_DATA_FALLBACK',
+          origem: 'IDEAL_SW_AUTONOMO_16_5',
           title: title,
-          body: options.body
+          body: body
         }
       );
     }catch(err){
       await logDiag(
         'SHOW_NOTIFICATION_ERRO',
         {
-          origem: 'FCM_DATA_FALLBACK',
+          origem: 'IDEAL_SW_AUTONOMO_16_5',
           mensagem:
             String(
               err &&
@@ -261,7 +243,7 @@ messaging.onBackgroundMessage(payload => {
 
       throw err;
     }
-  })();
+  })());
 });
 
 /* MASTER 12 · ETAPA 15.4 — teste local do canal de notificações. */
