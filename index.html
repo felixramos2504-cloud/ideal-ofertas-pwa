@@ -643,7 +643,7 @@ body.idealSplashAberta #iosHelp{
     const VAPID_PUBLIC_KEY =
       "BFqbS_rj0lihvZnpl3n6RBf58k1U5S8i96ziLKok2d19uuV8oo1hv6utVLz2KIUaJYKkdaYpHzuw0T1dVK4_2Mw";
 
-    const IDEAL_PUSH_VERSION = '12.17.1-ATIVAR-AVISOS';
+    const IDEAL_PUSH_VERSION = '12.17.2-DIAG-SUBSCRIPTION';
     const IDEAL_SW_URL = './firebase-messaging-sw.js?v=12171';
 
     const btnPush =
@@ -1671,7 +1671,7 @@ body.idealSplashAberta #iosHelp{
       pushDiagPanel.textContent = 'Lendo diagnóstico Push...';
 
       const linhas = [];
-      linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.17.1 ATIVAR AVISOS');
+      linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.17.2 SUBSCRIPTION');
       linhas.push('Data: ' + new Date().toLocaleString('pt-BR'));
       linhas.push('Permissão: ' + (('Notification' in window) ? Notification.permission : 'não suportado'));
       linhas.push('Service Worker suportado: ' + ('serviceWorker' in navigator ? 'SIM' : 'NÃO'));
@@ -1688,6 +1688,21 @@ body.idealSplashAberta #iosHelp{
         const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration('./') : null;
         linhas.push('Registro SW: ' + (reg ? 'SIM' : 'NÃO'));
         linhas.push('SW ativo: ' + (reg && reg.active ? 'SIM' : 'NÃO'));
+
+        if(reg && reg.pushManager){
+          const sub = await reg.pushManager.getSubscription();
+          linhas.push('PushSubscription ativa: ' + (sub ? 'SIM' : 'NÃO'));
+          if(sub && sub.endpoint){
+            try{
+              const ep = new URL(sub.endpoint);
+              linhas.push('Endpoint Push: ' + ep.hostname);
+            }catch(_){
+              linhas.push('Endpoint Push: presente');
+            }
+          }
+        }else{
+          linhas.push('PushSubscription ativa: NÃO');
+        }
       }catch(err){
         linhas.push('Erro ao consultar SW: ' + String(err && (err.message || err) || err));
       }
@@ -1993,12 +2008,31 @@ body.idealSplashAberta #iosHelp{
  async function ler(){
    p.style.display='block';
    const linhas=[];
-   linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.17.1 ATIVAR AVISOS');
+   linhas.push('IDEAL OFERTAS — DIAGNÓSTICO PUSH 12.17.2 SUBSCRIPTION');
    linhas.push('Data: '+new Date().toLocaleString('pt-BR'));
    linhas.push('Permissão: '+(('Notification' in window)?Notification.permission:'não suportado'));
    linhas.push('Identificador Firebase salvo no PWA: '+(localStorage.getItem('idealFcmToken')?'SIM':'NÃO'));
    linhas.push('Identificador confirmado no backend: '+(localStorage.getItem('idealPushTokenSalvoNaPlanilha')?'SIM':'NÃO'));
    linhas.push('Última confirmação backend: '+(localStorage.getItem('idealPushTokenSalvoEm')||'não confirmada'));
+
+   try{
+     const reg=('serviceWorker' in navigator)?await navigator.serviceWorker.getRegistration('./'):null;
+     linhas.push('Registro SW: '+(reg?'SIM':'NÃO'));
+     linhas.push('SW ativo: '+(reg&&reg.active?'SIM':'NÃO'));
+     if(reg&&reg.pushManager){
+       const sub=await reg.pushManager.getSubscription();
+       linhas.push('PushSubscription ativa: '+(sub?'SIM':'NÃO'));
+       if(sub&&sub.endpoint){
+         try{linhas.push('Endpoint Push: '+(new URL(sub.endpoint)).hostname);}
+         catch(_){linhas.push('Endpoint Push: presente');}
+       }
+     }else{
+       linhas.push('PushSubscription ativa: NÃO');
+     }
+   }catch(e){
+     linhas.push('Erro PushSubscription: '+String(e&&e.message||e));
+   }
+
    linhas.push('');
    linhas.push('ÚLTIMOS EVENTOS:');
    try{
